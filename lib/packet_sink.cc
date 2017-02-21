@@ -56,26 +56,25 @@ static const unsigned int CHIP_MAPPING[] = {
 					1368596360,
 					85537272,
 					139563807,
-	
 					2021988657};
 //revision begins
 static const unsigned int CHIP_MAPPING_2[] = {
-					15909,
-					27504,
-					20361,
-					6876,
-					21474,
-					1719,
-					38136,
-					49581,
-					9534,
-					28779,
-					35151,
-					56346,
-					57939,
-					46854,
-					63636,
-					44481};
+					29794,
+					15640,
+					12102,
+					3025,
+					25332,
+					6333,
+					17967,
+					20875,
+					2973,
+					17127,
+					20665,
+					29742,
+					7435,
+					26434,
+					14800,
+					11892};
 //revision ends
 static const int MAX_PKT_LEN    = 128 -  1; // remove header and CRC
 static const int MAX_LQI_SAMPLES = 8; // Number of chip correlation samples to take
@@ -205,23 +204,25 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 	FILE *bitstream2 = fopen("/home/captain/test/bitstream2","a");
 
 	d_chip_num = 16;
-		
+
 	if (VERBOSE)
 		fprintf(stderr,">>> Entering state machine\n"),fflush(stderr);
 	while(count < ninput) {
 		switch(d_state) {
 
 		case STATE_SYNC_SEARCH:    // Look for sync vector
+		//	fprintf(stderr,"STATE_SYNC_SEARCH\n");
 			if (VERBOSE)
 				fprintf(stderr,"SYNC Search, ninput=%d syncvec=%x\n", ninput, d_sync_vector),fflush(stderr);
 
 			while (count < ninput) {
+				/*
 				if(d_chip_num == 32){
 					fprintf(bitstream,"%d",slice(inbuf[count]));
 				}
 				else if(d_chip_num == 16){
 					fprintf(bitstream2, "%d",slice(inbuf[count]));
-				}
+				}*/
 				
 				if(slice(inbuf[count++]))
 					d_shift_reg = (d_shift_reg << 1) | 1;
@@ -231,7 +232,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				if(d_preamble_cnt > 0){
 					d_chip_cnt = d_chip_cnt+1;
 				}
-
 				if(d_chip_num == 32){
 					// The first if block syncronizes to chip sequences.
 					if(d_preamble_cnt == 0){
@@ -244,16 +244,16 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								fprintf(stderr,"Found 0 in chip sequence\n"),fflush(stderr);
 							// we found a 0 in the chip sequence
 							d_preamble_cnt+=1;
-							//fprintf(stderr, "Threshold %d d_preamble_cnt: %d\n", threshold, d_preamble_cnt);
-						
+							//fprintf(stderr, "Threshold %d d_preamble_cnt: %d\n", threshold, d_preamble_cnt);						
 						}
 					} else {
-
 						// we found the first 0, thus we only have to do the calculation every 32 chips
 						if(d_chip_cnt == 32){
-
 							d_chip_cnt = 0;
-
+							
+							if(decode_chips(d_shift_reg != 0xFF))
+								fprintf(stderr,"%d\n",decode_chips(d_shift_reg));
+							
 							if(d_packet_byte == 0) {
 								if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0xFFFFFFFE)) <= d_threshold) {
 									if (VERBOSE2)
@@ -261,18 +261,13 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									// we found an other 0 in the chip sequence
 									d_packet_byte = 0;
 									d_preamble_cnt ++;
-						
-
 								} else if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[7] & 0xFFFFFFFE)) <= d_threshold) {
 									if (VERBOSE2)
-								
-
 										fprintf(stderr,"Found first SFD\n"),fflush(stderr);
 									d_packet_byte = 7 << 4;
 								} else {
 									// we are not in the synchronization header
-									if (
-											VERBOSE2)
+									if (VERBOSE2)
 										fprintf(stderr, "Wrong first byte of SFD. %u\n", d_shift_reg), fflush(stderr);
 									enter_search();
 								
@@ -285,6 +280,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 										fprintf(stderr,"Found sync, 0x%x\n", d_packet_byte),fflush(stderr);
 									// found SDF
 									// setup for header decode
+						//			fprintf("I have found header(32bits)!\n");
 									enter_have_sync();
 									break;
 							
@@ -296,7 +292,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									break;
 								}
 							}
-
 						}
 					
 					}//d_premble_cnt == 0 ends
@@ -305,7 +300,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				else if(d_chip_num == 16){
 					if(d_preamble_cnt == 0){
 						unsigned int threshold;
-						threshold = gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING_2[0] & 0x7FFE));
+						threshold = gr::blocks::count_bits32((d_shift_reg & 0x00007FFE) ^ (CHIP_MAPPING_2[0] & 0x00007FFE));
 						if(threshold < d_threshold) {
 							if (VERBOSE2)
 								fprintf(stderr,"Found 0 in chip sequence\n"),fflush(stderr);
@@ -316,19 +311,20 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					else{
 						// we found the first 0, thus we only have to do the calculation every 32 chips
 						if(d_chip_cnt == 16){
-
+							int tmpchip = decode_chips(d_shift_reg);
+							if(tmpchip != 0xFF){
+								fprintf(stderr,"%x %d\n",d_shift_reg,decode_chips(d_shift_reg));
+							}
 							d_chip_cnt = 0;
 
 							if(d_packet_byte == 0) {
-								if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING_2[0] & 0xFFFE)) <= d_threshold) {
+								if (gr::blocks::count_bits32((d_shift_reg & 0x00007FFE) ^ (CHIP_MAPPING_2[0] & 0x0000FFFE)) <= d_threshold) {
 									if (VERBOSE2)
 										fprintf(stderr,"Found %d 0 in chip sequence\n", d_preamble_cnt),fflush(stderr);
 									// we found an other 0 in the chip sequence
 									d_packet_byte = 0;
-									d_preamble_cnt ++;
-						
-
-								} else if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING_2[7] & 0xFFFE)) <= d_threshold) {
+									d_preamble_cnt ++;			
+								} else if (gr::blocks::count_bits32((d_shift_reg & 0x00007FFE) ^ (CHIP_MAPPING_2[7] & 0x0000FFFE)) <= d_threshold) {
 									if (VERBOSE2)
 										fprintf(stderr,"Found first SFD\n"),fflush(stderr);
 									d_packet_byte = 7 << 4;
@@ -340,7 +336,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									break;
 								}
 							} else {
-								if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING_2[10] & 0xFFFE)) <= d_threshold) {
+								if (gr::blocks::count_bits32((d_shift_reg & 0x00007FFE) ^ (CHIP_MAPPING_2[10] & 0x0000FFFE)) <= d_threshold) {
 									d_packet_byte |= 0xA;
 									if (VERBOSE2)
 										fprintf(stderr,"Found sync, 0x%x\n", d_packet_byte),fflush(stderr);
@@ -364,6 +360,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_SYNC:
+			fprintf(stderr,"STATE HAVE SYNC\n");
 			if (VERBOSE2)
 				fprintf(stderr,"Header Search bitcnt=%d, header=0x%08x\n", d_headerbitlen_cnt, d_header),
 				fflush(stderr);
@@ -423,7 +420,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					if(d_chip_cnt == 16){
 						d_chip_cnt = 0;
 						unsigned char c = decode_chips(d_shift_reg);
-						fprintf(stream2,"%d\n",c);
+						//fprintf(stream2,"%d\n",c);
 
 						if(c == 0xFF){
 							// something is wrong. restart the search for a sync
@@ -458,6 +455,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_HEADER:
+			fprintf(stderr,"STATE HAVE HEADER");
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
 
