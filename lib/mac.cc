@@ -53,7 +53,6 @@ mac_impl(bool debug) :
 
 void mac_in(pmt::pmt_t msg) {
 	pmt::pmt_t blob;
-
 	if(pmt::is_pair(msg)) {
 		blob = pmt::cdr(msg);
 	} else {
@@ -61,7 +60,10 @@ void mac_in(pmt::pmt_t msg) {
 	}
 
 	size_t data_len = pmt::blob_length(blob);
+	dout << "Frame length is:" << data_len << std::endl;
+	
 	if(data_len < 11) {
+		dout << "Frame length is:"<<data_len<<std::endl;
 		dout << "MAC: frame too short. Dropping!" << std::endl;
 		return;
 	}
