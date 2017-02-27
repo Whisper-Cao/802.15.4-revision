@@ -32,7 +32,7 @@ using namespace gr::ieee802_15_4;
 #define VERBOSE 0
 // less verbose output for higher level debugging
 #define VERBOSE2 0
-
+#define VERBOSE3 1
 // this is the mapping between chips and symbols if we do
 // a fm demodulation of the O-QPSK signal. Note that this
 // is different than the O-QPSK chip sequence from the
@@ -82,22 +82,22 @@ static const unsigned int CHIP_MAPPING_3[] = {
 	10,122,2,62
 };
 static const long long unsigned int CHIP_MAPPING_4[] = {
-	8386371523261016006,
-	5112819643436657831,
-	2866246916230327916,
-	7829445230131705774,
-	3345233096174887031,
-	8623949804314321504,
-	6951216331564184674,
-	7088797404512110324,
-	837000513593763687,
-	7461230516181767015,
-	7451077617610412435,
-	1398200058664421457,
-	5878155633070284680,
-	599422297745104287,
-	2272155705545296797,
-	2134574632343660427
+8386371523260976029,
+2122429490862648331,
+836953071634853484,
+7785489504032290734,
+3345061394119811191,
+8623949133603168864,
+6951216328944219234,
+7088797404501876084,
+837000513593799778,
+7100942545992127476,
+8386418965219922323,
+1437882532822485073,
+5878310642734964616,
+599422903251606943,
+2272155707910556573,
+2134574632352899723
 };
 //revision ends
 static const int MAX_PKT_LEN    = 128 -  1; // remove header and CRC
@@ -150,6 +150,8 @@ unsigned char decode_chips(unsigned long long int chips){
 	int i;
 	int best_match = 0xFF;
 	int min_threshold = d_chip_num + 1; // Matching to 32 or 16 chips, could never have a error of 33 chips
+	bool notSync = (d_state == STATE_HAVE_HEADER);
+	bool flag = (have_header == 1) && VERBOSE3;
 
 	for(i=0; i<16; i++) {
 		// FIXME: we can store the last chip
@@ -163,7 +165,7 @@ unsigned char decode_chips(unsigned long long int chips){
 		else if(d_chip_num == 8)
 			threshold = gr::blocks::count_bits32((chips & 0x0000007E) ^( CHIP_MAPPING_3[i] & 0x0000007E));
 		else
-			threshold = gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFE) ^( CHIP_MAPPING_4[i] & 0x7FFFFFFFFFFFFFFE));
+			threshold = gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^( CHIP_MAPPING_4[i] & 0x7FFFFFFFFFFFFFFE));
 		//revision ends
 		if (threshold < min_threshold) {
 			best_match = i;
@@ -172,11 +174,15 @@ unsigned char decode_chips(unsigned long long int chips){
 	}
 
 	if (min_threshold < d_threshold) {
-		if (VERBOSE && d_chip_num == 32){
+		if (flag && d_chip_num == 32){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[best_match] & 0x7FFFFFFE)), fflush(stderr);
 		// LQI: Average number of chips correct * MAX_LQI_SAMPLES
-		}else if(VERBOSE && d_chip_num == 16){
+		}else if(flag && d_chip_num == 16){
 				fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFE) ^ (CHIP_MAPPING_2[best_match] & 0x7FFE)), fflush(stderr);
+		}else if(flag && d_chip_num == 8){
+			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7E) ^ (CHIP_MAPPING_3[best_match] & 0x7E)), fflush(stderr);			
+		}else if(flag && d_chip_num == 64){
+			fprintf(stderr, "Found sequence with %d errors at 0x%x, send: %x,receive:%x\n", min_threshold, (chips & 0x7FFFFFFFFFFFFFF0) ^ (CHIP_MAPPING_4[best_match]), fflush(stderr));
 		}
 		if (d_lqi_sample_count < MAX_LQI_SAMPLES) {
 			d_lqi += d_chip_num - min_threshold;//It is 32 originally
@@ -226,24 +232,19 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 	int count=0;
 	int i = 0;
 	
-	FILE *stream = fopen("/home/captain/test/trial","a");
-	FILE *stream2 = fopen("/home/captain/test/trial2","a");	
-	FILE *bitstream = fopen("/home/captain/test/bitstream","a");
-	FILE *bitstream2 = fopen("/home/captain/test/bitstream2","a");
+//	FILE *stream = fopen("/home/captain/test/trial","a");
+//	FILE *stream2 = fopen("/home/captain/test/trial2","a");	
+//	FILE *bitstream = fopen("/home/captain/test/bitstream","a")
+//	FILE *bitstream2 = fopen("/home/captain/test/bitstream2","a");
 
-	d_chip_num = 8;
-	/*
-	int x;
-	x = gr::blocks::count_bits64(8386371523261016007 ^ CHIP_MAPPING_4[0]);
-	fprintf(stderr,"%d",x);
-	*/
+	d_chip_num = 64;
 	if (VERBOSE)
 		fprintf(stderr,">>> Entering state machine\n"),fflush(stderr);
 	while(count < ninput) {
 		switch(d_state) {
 
 		case STATE_SYNC_SEARCH:    // Look for sync vector
-		//	fprintf(stderr,"STATE_SYNC_SEARCH\n");
+			have_header = 0;
 			if (VERBOSE)
 				fprintf(stderr,"SYNC Search, ninput=%d syncvec=%x\n", ninput, d_sync_vector),fflush(stderr);
 
@@ -263,8 +264,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						unsigned int threshold;
 						threshold = gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0x7FFFFFFE));
 						if(threshold < d_threshold) {
-							//  fprintf(stderr, "Threshold %d d_preamble_cnt: %d\n", threshold, d_preamble_cnt);
-							//if ((d_shift_reg&0xFFFFFE) == (CHIP_MAPPING[0]&0xFFFFFE)) {
 							if (VERBOSE2)
 								fprintf(stderr,"Found 0 in chip sequence\n"),fflush(stderr);
 							// we found a 0 in the chip sequence
@@ -276,9 +275,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						if(d_chip_cnt == 32){
 							d_chip_cnt = 0;
 							int tmpchip = decode_chips(d_shift_reg);
-							if(tmpchip != 0xFF){
-								fprintf(stderr,"%lx %d\n",d_shift_reg,decode_chips(d_shift_reg));
-							}
 					
 							if(d_packet_byte == 0) {
 								if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0xFFFFFFFE)) <= d_threshold) {
@@ -308,9 +304,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									// setup for header decode
 						//			fprintf("I have found header(32bits)!\n");
 									enter_have_sync();
-									break;
-							
-								
+									break;				
 								} else {
 									if (VERBOSE)
 										fprintf(stderr, "Wrong second byte of SFD. %u\n", d_shift_reg), fflush(stderr);
@@ -338,9 +332,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						// we found the first 0, thus we only have to do the calculation every 32 chips
 						if(d_chip_cnt == 16){
 							int tmpchip = decode_chips(d_shift_reg);
-							if(tmpchip != 0xFF){
-								fprintf(stderr,"%x %d\n",d_shift_reg,decode_chips(d_shift_reg));
-							}
 							d_chip_cnt = 0;
 
 							if(d_packet_byte == 0) {
@@ -396,9 +387,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						// we found the first 0, thus we only have to do the calculation every 32 chips
 						if(d_chip_cnt == 8){
 							int tmpchip = decode_chips(d_shift_reg);
-						/*	if(tmpchip != 0xFF){
-								fprintf(stderr,"%x %d\n",d_shift_reg,decode_chips(d_shift_reg));
-							}*/
 							d_chip_cnt = 0;
 
 							if(d_packet_byte == 0) {
@@ -455,10 +443,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						// we found the first 0, thus we only have to do the calculation every 32 chips
 						if(d_chip_cnt == 64){
 							d_chip_cnt = 0;
-							int tmpchip = decode_chips(d_shift_reg);
-							if(tmpchip != 0xFF){
-								fprintf(stderr,"%lx %d\n",d_shift_reg,decode_chips(d_shift_reg));
-							}
 
 							if(d_packet_byte == 0) {
 								if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[0] & 0xFFFFFFFFFFFFFFFE)) <= d_threshold) {
@@ -503,6 +487,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_SYNC:
+			have_header = 0;
 		//	fprintf(stderr,"have sync!\n");
 			if (VERBOSE2)
 				fprintf(stderr,"Header Search bitcnt=%d, header=0x%08x\n", d_headerbitlen_cnt, d_header),
@@ -520,7 +505,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					if(d_chip_cnt == 32){
 						d_chip_cnt = 0;
 						unsigned char c = decode_chips(d_shift_reg);
-						fprintf(stream,"%d\n",c);
 						if(c == 0xFF){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
@@ -658,6 +642,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_HEADER:
+			have_header = 1;
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
 
@@ -672,7 +657,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				
 					if(d_chip_cnt == 0){
 						unsigned char c = decode_chips(d_shift_reg);
-						fprintf(stream, "%d\n",c);
 						
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
@@ -781,7 +765,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				
 					if(d_chip_cnt == 0){
 						unsigned char c = decode_chips(d_shift_reg);
-						fprintf(stderr,"%d ",c);
+	//					fprintf(stderr,"%d ",c);
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
@@ -893,10 +877,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 
 		}
 	}
-	fclose(stream);
-	fclose(stream2);
-	fclose(bitstream);
-	fclose(bitstream2);
 	if(VERBOSE2)
 		fprintf(stderr, "Samples Processed: %d\n", ninput_items[0]), fflush(stderr);
 
@@ -928,7 +908,7 @@ private:
 	unsigned int      d_lqi;                   // Link Quality Information
 	unsigned int      d_lqi_sample_count;
 
-
+	unsigned int	  have_header;
 	unsigned int	  d_chip_num;			   //chip_num is an optional variable, here we set it manually
 	// FIXME:
 	char buf[256];

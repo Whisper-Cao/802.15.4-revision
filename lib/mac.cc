@@ -63,7 +63,7 @@ void mac_in(pmt::pmt_t msg) {
 	dout << "Frame length is:" << data_len << std::endl;
 	
 	if(data_len < 11) {
-		dout << "Frame length is:"<<data_len<<std::endl;
+	//	dout << "Frame length is:"<<data_len<<std::endl;
 		dout << "MAC: frame too short. Dropping!" << std::endl;
 		return;
 	}
