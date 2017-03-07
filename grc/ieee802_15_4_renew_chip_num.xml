@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<block>
+	<name>Renew Chip Num</name>
+	<key>ieee802_15_4_Renew_Chip_Num</key>
+	<category>[IEEE802.15.4]</category>
+	<import>import ieee802_15_4</import>
+	<make>ieee802_15_4.renew_chip_num()</make>
+
+	<sink>
+		<name>ack in</name>
+		<type>message</type>
+		<optional>1</optional>
+	</sink>
+
+</block>

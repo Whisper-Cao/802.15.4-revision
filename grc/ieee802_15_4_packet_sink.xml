@@ -4,12 +4,19 @@
 	<key>ieee802_15_4_packet_sink</key>
 	<category>[IEEE802.15.4]</category>
 	<import>import ieee802_15_4</import>
-	<make>ieee802_15_4.packet_sink($th)</make>
+	<make>ieee802_15_4.packet_sink($th,$cn)</make>
 
 	<param>
 		<name>Threshold</name>
 		<key>th</key>
 		<value>10</value>
+		<type>int</type>
+	</param>
+
+	<param>
+		<name>chip num</name>
+		<key>cn</key>
+		<value>32</value>
 		<type>int</type>
 	</param>
 

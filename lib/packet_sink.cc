@@ -145,6 +145,13 @@ void enter_have_header(int payload_len)
 	d_packet_byte_index = 0;
 }
 
+void reset_ber()
+{
+	bit_count = 0;
+	error_count = 0;
+	bit_error_rate = 0;
+}
+
 
 unsigned char decode_chips(unsigned long long int chips){
 	int i;
@@ -173,7 +180,9 @@ unsigned char decode_chips(unsigned long long int chips){
 		}
 	}
 
+	flag = false;
 	if (min_threshold < d_threshold) {
+		error_count += count_error(chips,d_chip_num,best_match);
 		if (flag && d_chip_num == 32){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[best_match] & 0x7FFFFFFE)), fflush(stderr);
 		// LQI: Average number of chips correct * MAX_LQI_SAMPLES
@@ -188,25 +197,55 @@ unsigned char decode_chips(unsigned long long int chips){
 			d_lqi += d_chip_num - min_threshold;//It is 32 originally
 			d_lqi_sample_count++;
 		}
-
 		return (char)best_match & 0xF;
 	}
-
+	else{
+		error_count += d_chip_num;
+	}
 	return 0xFF;
+}
+
+unsigned int count_error(long long int chips,int chip_num, int match){
+	if(chip_num == 64)
+		return gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[match] & 0x7FFFFFFFFFFFFFFE));
+	else if(chip_num == 32)
+		return gr::blocks::count_bits32((chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[match] & 0x7FFFFFFE));
+	else if(chip_num == 16)	
+		return gr::blocks::count_bits16((chips & 0x7FFE) ^ (CHIP_MAPPING_2[match] & 0x7FFE));
+	else if(chip_num == 8)	
+		return gr::blocks::count_bits8((chips & 0x7E) ^ (CHIP_MAPPING_3[match] & 0x7E));
 }
 
 int slice(float x) {
 	return x > 0 ? 1 : 0;
 }
 
-packet_sink_impl(int threshold)
+double get_ber_value(){
+	return double(error_count)/bit_count;
+}
+
+int8_t feedback_new_chip_num(int options){
+	//option = 0: increase optiaon = 1:decrease
+	//decrease part
+	if(options == 0){
+		//increase by 1
+	}
+	else{
+		//decrease by 1
+	}
+//	message_port_pub(pmt::mp("feedback out"),32);
+	//increase part
+	return 32;
+}
+
+packet_sink_impl(int threshold,int chip_num)
   : block ("packet_sink",
 		   gr::io_signature::make(1, 1, sizeof(float)),
-		   gr::io_signature::make(0, 0, 0)),
+		   gr::io_signature::make(0, 0, sizeof(int8_t))),
     d_threshold(threshold)
 {
 	d_sync_vector = 0xA7;
-
+	d_chip_num = chip_num;
 	// Link Quality Information
 	d_lqi = 0;
 	d_lqi_sample_count = 0;
@@ -216,6 +255,7 @@ packet_sink_impl(int threshold)
 	enter_search();
 
 	message_port_register_out(pmt::mp("out"));
+	
 
 }
 
@@ -226,18 +266,12 @@ packet_sink_impl(int threshold)
 int general_work(int noutput, gr_vector_int& ninput_items,
 			gr_vector_const_void_star& input_items,
 			gr_vector_void_star& output_items ) {
-
 	const float *inbuf = (const float*)input_items[0];
         int ninput = ninput_items[0];
 	int count=0;
 	int i = 0;
-	
-//	FILE *stream = fopen("/home/captain/test/trial","a");
-//	FILE *stream2 = fopen("/home/captain/test/trial2","a");	
-//	FILE *bitstream = fopen("/home/captain/test/bitstream","a")
-//	FILE *bitstream2 = fopen("/home/captain/test/bitstream2","a");
+	unsigned char new_chip_num = 0;
 
-	d_chip_num = 64;
 	if (VERBOSE)
 		fprintf(stderr,">>> Entering state machine\n"),fflush(stderr);
 	while(count < ninput) {
@@ -275,7 +309,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						if(d_chip_cnt == 32){
 							d_chip_cnt = 0;
 							int tmpchip = decode_chips(d_shift_reg);
-					
+							//if(tmpchip != 0xff) fprintf(stderr,"%d\n",tmpchip);
 							if(d_packet_byte == 0) {
 								if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0xFFFFFFFE)) <= d_threshold) {
 									if (VERBOSE2)
@@ -488,7 +522,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 
 		case STATE_HAVE_SYNC:
 			have_header = 0;
-		//	fprintf(stderr,"have sync!\n");
+			reset_ber();
 			if (VERBOSE2)
 				fprintf(stderr,"Header Search bitcnt=%d, header=0x%08x\n", d_headerbitlen_cnt, d_header),
 				fflush(stderr);
@@ -642,6 +676,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_HEADER:
+			
 			have_header = 1;
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
@@ -656,6 +691,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					d_chip_cnt = (d_chip_cnt+1)%32;
 				
 					if(d_chip_cnt == 0){
+						bit_count += 32;
 						unsigned char c = decode_chips(d_shift_reg);
 						
 						if(c == 0xff){
@@ -687,12 +723,17 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if (d_payload_cnt >= d_packetlen){	// packet is filled, including CRC. might do check later in here
 								unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
 								unsigned char lqi = (scaled_lqi >= 256? 255 : scaled_lqi);
-
+								//new_chip_num = 16;
+								
 								pmt::pmt_t meta = pmt::make_dict();
 								meta = pmt::dict_add(meta, pmt::mp("lqi"), pmt::from_long(lqi));
 
 								std::memcpy(buf, d_packet, d_packetlen_cnt);
+							
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
+								//my code
+							//	pmt::pmt_t fb_info = pmt::make_blob(&new_chip_num,sizeof(char));
+							//	meta = pmt::cons(meta,fb_info);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
 
@@ -710,6 +751,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					d_chip_cnt = (d_chip_cnt+1)%16;
 				
 					if(d_chip_cnt == 0){
+						bit_count += 16;
 						unsigned char c = decode_chips(d_shift_reg);
 					//	fprintf(stream2, "%d\n",c);
 						if(c == 0xff){
@@ -760,12 +802,11 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					}
 				}
 				else if(d_chip_num == 8){
-			//		fprintf(stderr,"Have Header!\n");
 					d_chip_cnt = (d_chip_cnt+1)%8;
 				
 					if(d_chip_cnt == 0){
+						bit_count += 8;
 						unsigned char c = decode_chips(d_shift_reg);
-	//					fprintf(stderr,"%d ",c);
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
@@ -818,6 +859,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					d_chip_cnt = (d_chip_cnt+1)%64;
 				
 					if(d_chip_cnt == 0){
+						bit_count += 64;
 						unsigned char c = decode_chips(d_shift_reg);
 					//	fprintf(stream2, "%d\n",c);
 						if(c == 0xff){
@@ -869,6 +911,14 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				}
 				//my revision ends
 			}
+
+			//ber check will be put here
+		//	if(get_ber_value() > ber_threshold)
+		//	fprintf(stderr,"header\n");
+//			new_chip_num = feedback_new_chip_num(0);
+		//	new_chip_num = 16;
+//			feedback_out[0] = new_chip_num;
+		//	else if("time % 100 = 0")
 			break;
 
 		default:
@@ -881,6 +931,13 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 		fprintf(stderr, "Samples Processed: %d\n", ninput_items[0]), fflush(stderr);
 
         consume(0, ninput_items[0]);
+	if(new_chip_num != 0) 
+	{	
+		FILE *ack_file = fopen("/home/captain/test/receiver/ack","w+");
+		fprintf(ack_file,"%d",new_chip_num);
+		fclose(ack_file);	
+	}
+
 
 	return 0;
 }
@@ -910,10 +967,14 @@ private:
 
 	unsigned int	  have_header;
 	unsigned int	  d_chip_num;			   //chip_num is an optional variable, here we set it manually
+	double			  bit_error_rate;			//indicate BER per packet
+	unsigned int	  error_count;			  //errors per packet
+	unsigned int	  bit_count;				//bit count in a data stream
+	unsigned int	  ber_threshold;			//over the threshold we should lower the d_chip_num
 	// FIXME:
 	char buf[256];
 };
 
-packet_sink::sptr packet_sink::make(unsigned int threshold) {
-	return gnuradio::get_initial_sptr(new packet_sink_impl(threshold));
+packet_sink::sptr packet_sink::make(unsigned int threshold,unsigned int chip_num) {
+	return gnuradio::get_initial_sptr(new packet_sink_impl(threshold,chip_num));
 }

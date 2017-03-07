@@ -14,25 +14,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
-#define INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
+#ifndef INCLUDED_IEEE802_15_4_CHUNKS_TO_SYMBOLS_IMPL_H
+#define INCLUDED_IEEE802_15_4_CHUNKS_TO_SYMBOLS_IMPL_H
 
-#include <ieee802_15_4/api.h>
-#include <gnuradio/block.h>
+#include <ieee802_15_4/chunks_to_symbols.h>
 
 namespace gr {
 namespace ieee802_15_4 {
 
-class IEEE802_15_4_API packet_sink : virtual public block
+class chunks_to_symbols_impl : public chunks_to_symbols
 {
 public:
+	chunks_to_symbols_impl();
+	~chunks_to_symbols_impl();
 
-	typedef boost::shared_ptr<packet_sink> sptr;
-	static sptr make(unsigned int threshold = 10,unsigned int chip_num = 32);
+	int symbol_table_init(int d);
+	int work(int noutput_items,
+			gr_vector_const_void_star &input_items,
+			gr_vector_void_star &output_items);
+	
 
+/*
+private:
+	std::vector<gr_complex> d_symbol_table;
+*/
 };
+} /* namespace ieee802_11 */
+} /* namespace gr */
 
-}  // namespace ieee802_15_4
-}  // namespace gr
-
-#endif /* INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H */
+#endif /* INCLUDED_IEEE802_11_CHUNKS_TO_SYMBOLS_IMPL_H */

@@ -46,6 +46,9 @@
 #include "ieee802_15_4/rime_stack.h"
 #include "ieee802_15_4/zeropadding_b.h"
 #include "ieee802_15_4/zeropadding_removal_b.h"
+#include "ieee802_15_4/chunks_to_symbols.h"
+#include "ieee802_15_4/message_feedback.h"
+#include "ieee802_15_4/renew_chip_num.h"
 %}
 
 %include "ieee802_15_4/access_code_prefixer.h"
@@ -98,3 +101,10 @@ GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, rime_stack);
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, zeropadding_b);
 %include "ieee802_15_4/zeropadding_removal_b.h"
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, zeropadding_removal_b);
+%include "ieee802_15_4/renew_chip_num.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, renew_chip_num);
+%include "ieee802_15_4/chunks_to_symbols.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, chunks_to_symbols);
+%include "ieee802_15_4/message_feedback.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, message_feedback);
+

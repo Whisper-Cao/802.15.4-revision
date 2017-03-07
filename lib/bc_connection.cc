@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "bc_connection.h"
+#include <cstring>
 
 using namespace gr::ieee802_15_4;
 
@@ -41,7 +42,8 @@ bc_connection::pack(pmt::pmt_t msg)
 {
 	std::array<uint8_t,256> buf = bc_connection::make_msgbuf(d_channel,
 			d_rime_add_mine);
-
+	//fprintf(stderr,static_cast<const char*>(pmt::blob_data(msg)));
+//	std::cout << pmt::blob_data(msg) << std::endl;
 	if(pmt::is_eof_object(msg)){
 		d_block->message_port_pub(d_mac_outport, pmt::PMT_EOF);
 		d_block->detail().get()->set_done(true);
@@ -66,6 +68,12 @@ bc_connection::unpack(pmt::pmt_t msg)
 	unsigned char buf[256];
 	size_t data_len = pmt::blob_length(msg);
 	std::memcpy(buf, pmt::blob_data(msg), data_len);
+/*
+	for(int i = 0; i < data_len; i++){
+		if(int(buf[i]) < 128 && int(buf[i]) > 20)
+			std::cout << (buf[i]) << " ";
+	}std::cout <<std::endl;
+*/
 	pmt::pmt_t rime_payload = pmt::make_blob(buf + header_length, data_len - header_length);
 	d_block->message_port_pub(d_outport, pmt::cons(pmt::PMT_NIL, rime_payload));
 }

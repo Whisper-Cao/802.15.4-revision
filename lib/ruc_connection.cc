@@ -101,6 +101,7 @@ ruc_connection::pack(pmt::pmt_t msg)
 void
 ruc_connection::unpack(pmt::pmt_t msg)
 {
+	fprintf(stderr,"ruc_connections here!\n");
 	uint8_t buf[256];
 	uint8_t target_rime_zero, target_rime_one;
 	uint8_t sender_rime_zero, sender_rime_one;

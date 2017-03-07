@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
-#define INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
+#ifndef INCLUDED_GR_IEEE802_15_4_RENEW_CHIP_NUM_H
+#define INCLUDED_GR_IEEE802_15_4_RENEW_CHIP_NUM_H
 
 #include <ieee802_15_4/api.h>
 #include <gnuradio/block.h>
@@ -23,16 +23,14 @@
 namespace gr {
 namespace ieee802_15_4 {
 
-class IEEE802_15_4_API packet_sink : virtual public block
+class IEEE802_15_4_API renew_chip_num: virtual public block
 {
-public:
-
-	typedef boost::shared_ptr<packet_sink> sptr;
-	static sptr make(unsigned int threshold = 10,unsigned int chip_num = 32);
-
+public:	
+	typedef boost::shared_ptr<renew_chip_num> sptr;
+	static sptr make();
 };
 
-}  // namespace ieee802_15_4
+}  // namespace ieee802_11
 }  // namespace gr
 
-#endif /* INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H */
+#endif /* INCLUDED_GR_IEEE802_15_4_MAC_H */

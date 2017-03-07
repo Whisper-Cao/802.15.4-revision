@@ -49,6 +49,9 @@ list(APPEND ieee802_15_4_sources
     uc_connection.cc
     zeropadding_b_impl.cc
     zeropadding_removal_b_impl.cc
+    chunks_to_symbols_impl.cc
+    message_feedback.cc
+    renew_chip_num.cc
 )
 
 list(APPEND ieee802_15_4_libs

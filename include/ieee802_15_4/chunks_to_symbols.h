@@ -14,25 +14,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
-#define INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H
+#ifndef INCLUDED_IEEE802_15_4_CHUNKS_TO_SYMBOLS_H
+#define INCLUDED_IEEE802_15_4_CHUNKS_TO_SYMBOLS_H
 
 #include <ieee802_15_4/api.h>
-#include <gnuradio/block.h>
+#include <gnuradio/sync_interpolator.h>
 
 namespace gr {
 namespace ieee802_15_4 {
 
-class IEEE802_15_4_API packet_sink : virtual public block
+class IEEE802_15_4_API chunks_to_symbols : virtual public sync_interpolator
 {
 public:
-
-	typedef boost::shared_ptr<packet_sink> sptr;
-	static sptr make(unsigned int threshold = 10,unsigned int chip_num = 32);
-
+        typedef boost::shared_ptr<chunks_to_symbols> sptr;
+        static sptr make();
 };
 
-}  // namespace ieee802_15_4
-}  // namespace gr
+} /* namespace ieee802_15_4 */
+} /* namespace gr */
 
-#endif /* INCLUDED_GR_IEEE802_15_4_PACKET_SINK_H */
+#endif /* INCLUDED_IEEE802_11_CHUNKS_TO_SYMBOLS_H */

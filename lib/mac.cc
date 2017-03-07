@@ -17,7 +17,7 @@
 #include <ieee802_15_4/mac.h>
 #include <gnuradio/io_signature.h>
 #include <gnuradio/block_detail.h>
-
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 
@@ -78,9 +78,16 @@ void mac_in(pmt::pmt_t msg) {
 	else{
 		dout << "MAC: correct crc. Propagate packet to APP layer." << std::endl;
 	}
+	pmt::pmt_t mac_payload = pmt::make_blob((char*)pmt::blob_data(blob) + 9 , data_len-9-2);// maybe +9, -2 -1
+	
+	char *buf = (char*)pmt::blob_data(blob);
 
-	pmt::pmt_t mac_payload = pmt::make_blob((char*)pmt::blob_data(blob) + 9 , data_len - 9 - 2);
-
+	/*
+	for(int i = 0; i < data_len; i++){
+		std::cout << int(buf[i])  << std::endl;
+	}
+	*/
+//	std::cout << (char*)pmt::blob_data(blob) << std::endl;
 	message_port_pub(pmt::mp("app out"), pmt::cons(pmt::PMT_NIL, mac_payload));
 }
 
