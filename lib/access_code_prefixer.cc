@@ -19,6 +19,7 @@
 #include <gnuradio/io_signature.h>
 #include <gnuradio/block_detail.h>
 #include <string.h>
+#include <fstream>
 
 using namespace gr::ieee802_15_4;
 
@@ -36,12 +37,24 @@ class access_code_prefixer_impl : public access_code_prefixer {
 	    message_port_register_in(pmt::mp("in"));
 	    set_msg_handler(pmt::mp("in"), boost::bind(&access_code_prefixer_impl::make_frame, this, _1));
 
+		char tmp[5];
+		FILE *f = fopen("/home/captain/test/transceiver/rec_ack","r");
+		fscanf(f,"%s",tmp);
+		fclose(f);
 	    buf[0] = 0x00;
 	    buf[1] = 0x00;
 	    buf[2] = 0x00;
 	    buf[3] = 0x00;
-	    buf[4] = 0xA7;//00A7
-
+		if(tmp[0] == 'A')
+			buf[4] = 0xA7;//64bit
+		else if(tmp[0] == 'B')
+			buf[4] = 0xB7; //32bit
+		else if(tmp[0] == 'C')
+			buf[4] = 0xC7;//16bit
+		else if(tmp[0] == 'D')
+			buf[4] = 0xD7;//4bit
+		else
+			buf[4] = 0xB7;//default 32bit
 	}
 
 	~access_code_prefixer_impl() {

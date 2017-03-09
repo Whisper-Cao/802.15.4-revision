@@ -31,7 +31,7 @@ public:
 	virtual float get_packet_error_ratio() = 0;
 	
 	typedef boost::shared_ptr<mac> sptr;
-	static sptr make(bool debug= false);
+	static sptr make(bool debug= false,bool is_sender = true);
 };
 
 }  // namespace ieee802_11

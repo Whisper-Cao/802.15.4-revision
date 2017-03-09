@@ -16,6 +16,7 @@
 using namespace gr::ieee802_15_4;
 
 std::vector<gr_complex> d_symbol_table;
+std::vector<gr_complex> header_symbol_table;
 
 const int table_64[] = {
 -1,-1,1,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,1,1,1,-1,1,1,-1,-1,1,1,1,-1,-1,-1,-1,1,1,-1,1,-1,1,-1,-1,1,-1,-1,-1,1,-1,1,1,1,-1,-1,1,1,-1,1,-1,1,1,-1,1,1,1,-1,-1,-1,-1,
@@ -58,7 +59,7 @@ const int table_32[] = {
 const int table_16[] = {
 -1,-1,1,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,1,
 -1,1,1,-1,1,-1,1,1,-1,1,1,1,-1,-1,-1,-1,
--1,-1,1,-1,-1,1,-1,1,-1,-1,1,1,1,1 1,-1,
+-1,-1,1,-1,-1,1,-1,1,-1,-1,1,1,1,1,1,-1,
 -1,1,1,1,-1,-1,-1,-1,-1,1,1,-1,1,-1,1,1,
 -1,1,-1,1,-1,-1,1,1,1,1,1,-1,-1,-1,1,-1,
 -1,-1,-1,-1,-1,1,1,-1,1,-1,1,1,-1,1,1,1,
@@ -73,10 +74,58 @@ const int table_16[] = {
 1,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,1,-1,-1,
 1,-1,1,-1,1,1,-1,1,1,1,-1,-1,-1,-1,-1,1
 };
+
+const int table_4[] = {
+-1,-1,-1,-1,
+1,-1,-1,-1,
+-1,1,-1,-1,
+1,1,-1,-1,
+-1,-1,1,-1,
+1,-1,1,-1,
+-1,1,1,-1,
+1,1,1,-1,
+-1,-1,-1,1,
+1,-1,-1,1,
+-1,1,-1,1,
+1,1,-1,1,
+-1,-1,1,1,
+1,-1,1,1,
+-1,1,1,1,
+1,1,1,1,	 
+};
+
+
 int chunks_to_symbols_impl::symbol_table_init(int d){
-	if(d==32){
+	for(int i = 0; i < 256; i++){
+		header_symbol_table.push_back(gr_complex(table_32[2*i],table_32[2*i+1]));
+	}
+
+	if(d == 64){
+		for(int i = 0; i < 512; i++)
+			d_symbol_table.push_back(gr_complex(table_64[2*i],table_64[2*i+1]));
+	}
+	else if(d==32){
 		for(int i = 0; i < 256;i++)
 			d_symbol_table.push_back(gr_complex(table_32[2*i],table_32[2*i+1]));
+	}
+	else if(d == 16){
+		for(int i = 0; i < 128;i++)
+			d_symbol_table.push_back(gr_complex(table_16[2*i],table_16[2*i+1]));
+	}
+	else{
+		for(int i = 0; i < 32; i++)
+			d_symbol_table.push_back(gr_complex(table_4[2*i],table_4[2*i+1]));
+	}
+}
+
+int getChipNum(char c){
+	if(c == 'A') return 64;
+	else if(c == 'B') return 32;
+	else if(c == 'C') return 16;
+	else if(c == 'D') return 4;
+	else{
+		std::cout << "ReadError: Wrong chip number in the ACK!" << std::endl;
+		return 32;
 	}
 }
 
@@ -108,38 +157,44 @@ int chunks_to_symbols_impl::work(
 		gr_vector_void_star &output_items)
 {
     //	this->set_interpolation(16);
-	 // fprintf(stderr,"here!\n");
+	 // fprintf(stderr,"I'm doing chunks to symbols!\n");
 	  assert(noutput_items % d_D == 0);
       assert(input_items.size() == output_items.size());
       int nstreams = input_items.size();
-	//  fprintf(stderr,"input_items size is %d\n",nstreams);
-//	  int *in1 = (int *)(input_items[0]);
-	  symbol_table_init(32);
-	  int d_D = 16;
-//	  fprintf(stderr,"The first input is %d\n",*in1);
-
+	  char tmp[5];
+	  FILE *f = fopen("/home/captain/test/transceiver/rec_ack","r");
+	  fscanf(f,"%s",tmp);
+	  fclose(f);
+	  //symbol_table_init(32);
+	  int d_D = getChipNum(tmp[0])/2;
+	  symbol_table_init(2*d_D);
 
       for(int m = 0 ; m < nstreams; m++) {
         const int8_t *in = (int8_t*)input_items[m];
         gr_complex *out = (gr_complex *)output_items[0];
-	//	fprintf(stderr," %d\n",noutput_items);
         std::vector<tag_t> tags;
         get_tags_in_range(tags, m, nitems_read(m), nitems_read(m)+noutput_items/d_D);
         tag_checker tchecker(tags);
 
-        // per stream processing
         for(int i = 0; i < noutput_items / d_D; i++) {
-	     // fprintf(stderr,"in:%d\n",in[i]);
-          std::vector<tag_t> tags_now;
+		  std::vector<tag_t> tags_now;
           tchecker.get_tags(tags_now, i+nitems_read(m));
           for (unsigned int j=0; j<tags_now.size(); j++) {
             tag_t tag = tags_now[j];
             dispatch_msg(tag.key, tag.value);
           }
-          assert(((unsigned int)in[i]*d_D+d_D) <= d_symbol_table.size());
-          memcpy(out, &d_symbol_table[(unsigned int)in[i]*d_D], d_D*sizeof(gr_complex));
-          out+=d_D;
+	//	  fprintf(stderr,"%d ",in[i]);
+		  assert(((unsigned int)in[i]*d_D+d_D) <= d_symbol_table.size());
+	      if(i < 10){
+			memcpy(out,&header_symbol_table[(unsigned int)in[i]*16],16*sizeof(gr_complex));
+			out += 16;
+		  }
+		  else{
+			memcpy(out, &d_symbol_table[(unsigned int)in[i]*d_D], d_D*sizeof(gr_complex));
+			out+=d_D;
+		  }
 		}
+		//std::cout << std::endl;
       }
       return noutput_items;
 }

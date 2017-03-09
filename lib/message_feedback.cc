@@ -48,16 +48,17 @@ public:
 
 		size_t data_len = pmt::blob_length(blob);
 		
-
+/*
 		if(data_len < 11){
 			dout << "No feedback because of short frame" << std::endl;
 			return;
 		}
 
 		uint16_t crc = crc16((char*)pmt::blob_data(blob),data_len);
+
 		if(!crc){
-			message_feedback_impl::fb_chip_num();
-		}
+*/			message_feedback_impl::fb_chip_num();
+		
 	}
 
 	void fb_chip_num(){
@@ -73,8 +74,8 @@ public:
 //		chip_num = &x;
 		fclose(f);
 		std::memcpy(&buf,&chip_num,sizeof(int));
-		char buff[] = "Test Message!";
-		pmt::pmt_t msg = pmt::make_blob(buff,50);
+		char buff[] = "A";
+		pmt::pmt_t msg = pmt::make_blob(buff,strlen(buff));
 		message_port_pub(pmt::mp("out to RS"),msg);
 		fprintf(stderr,"we have give a feedback of %d\n",chip_num);
 	}

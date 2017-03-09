@@ -4,7 +4,7 @@
 	<key>ieee802_15_4_mac</key>
 	<category>[IEEE802.15.4]</category>
 	<import>import ieee802_15_4</import>
-	<make>ieee802_15_4.mac($debug)</make>
+	<make>ieee802_15_4.mac($debug,$is_sender)</make>
 
 	<param>
 		<name>Debug</name>
@@ -20,6 +20,20 @@
 			<name>Disable</name>
 			<key>False</key>
 		</option>
+	</param>
+	<param>
+		<name>isSender</name>
+		<key>is_sender</key>
+		<value>True</value>
+		<type>bool</type>
+		<option>
+			<name>Enable</name>
+			<key>True</key>
+		</option>
+		<option>
+			<name>Disable</name>
+			<key>False</key>
+		</option>		
 	</param>
 	<sink>
 		<name>pdu in</name>
