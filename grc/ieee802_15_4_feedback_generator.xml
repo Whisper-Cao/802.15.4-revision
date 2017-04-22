@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<block>
+	<name>Feedback Generator</name>
+	<key>ieee802_15_4_feedback_generator</key>
+	<category>[IEEE802.15.4]</category>
+	<import>import ieee802_15_4</import>
+	<make>ieee802_15_4.feedback_generator()</make>
+
+	<source>
+		<name>out to RS</name>
+		<type>message</type>
+
+	</source>
+
+</block>

@@ -25,6 +25,7 @@
 #include <cstring>
 #include <gnuradio/blocks/count_bits.h>
 #include <iostream>
+#include <math.h>
 
 using namespace gr::ieee802_15_4;
 
@@ -76,7 +77,7 @@ static const unsigned int CHIP_MAPPING_2[] = {
 					14800,
 					11892};
 static const unsigned int CHIP_MAPPING_3[] = {
-	0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+	21,22,19,16,25,26,31,28,13,14,11,8,1,2,7,4
 };
 static const long long unsigned int CHIP_MAPPING_4[] = {
 8386371523260976029,
@@ -140,14 +141,12 @@ void enter_have_header(int payload_len)
 	d_payload_cnt = 0;
 	d_packet_byte = 0;
 	d_packet_byte_index = 0;
+	for(int i = 0; i < 4; i++){
+		be1[i] = 0;
+		be2[i] = 0;
+	}
 }
 
-void reset_ber()
-{
-	bit_count = 0;
-	error_count = 0;
-	bit_error_rate = 0;
-}
 
 
 unsigned char decode_chips(unsigned long long int chips){
@@ -156,6 +155,7 @@ unsigned char decode_chips(unsigned long long int chips){
 	int min_threshold = d_chip_num + 1; // Matching to 32 or 16 chips, could never have a error of 33 chips
 	bool notSync = (d_state == STATE_HAVE_HEADER);
 	bool flag = (have_header == 1) && VERBOSE3;
+
 
 	for(i=0; i<16; i++) {
 		// FIXME: we can store the last chip
@@ -176,16 +176,32 @@ unsigned char decode_chips(unsigned long long int chips){
 			min_threshold = threshold;
 		}
 	}
+	unsigned long long x_chips;
+	if(d_chip_num == 32){
+		x_chips = chips & 0xFFFFFFFF;
+	}
+	else if(d_chip_num == 16){
+		x_chips = chips &0xFFFF;
+	}
+	else if(d_chip_num == 4){
+		x_chips = chips & 0xF;
+	}
+	received = fopen("/home/captain/experiment/ber-estimation/received","ab");
 
+	fprintf(received,"%llx  ",x_chips);
+	fclose(received);
+//	fprintf(sequence,"%d ",best_match);
+//	fprintf(estimated," ");
+//	flag = true;
 	flag = false;
 	if (min_threshold < d_threshold) {
-		error_count += count_error(chips,d_chip_num,best_match);
+		//error_count += count_error(chips,d_chip_num,best_match);
 		if (flag && d_chip_num == 32){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[best_match] & 0x7FFFFFFE)), fflush(stderr);
 		// LQI: Average number of chips correct * MAX_LQI_SAMPLES
 		}else if(flag && d_chip_num == 16){
 				fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFE) ^ (CHIP_MAPPING_2[best_match] & 0x7FFE)), fflush(stderr);
-		}else if(flag && d_chip_num == 8){
+		}else if(flag && d_chip_num == 4){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7E) ^ (CHIP_MAPPING_3[best_match] & 0x7E)), fflush(stderr);			
 		}else if(flag && d_chip_num == 64){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x, send: %x,receive:%x\n", min_threshold, (chips & 0x7FFFFFFFFFFFFFF0) ^ (CHIP_MAPPING_4[best_match]), fflush(stderr));
@@ -194,45 +210,262 @@ unsigned char decode_chips(unsigned long long int chips){
 			d_lqi += d_chip_num - min_threshold;//It is 32 originally
 			d_lqi_sample_count++;
 		}
+	//	fprintf(received,"%llx ",chips);
 		return (char)best_match & 0xF;
 	}
 	else{
-		error_count += d_chip_num;
+		//error_count += d_chip_num;
+	//	fprintf(received,"%llx ",chips);
 	}
+
+	//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
+	//fprintf(stderr,"!\n");
+	//fprintf(stderr,"%llx ",chips);
+	//fclose(f);
 	return 0xFF;
 }
 
 unsigned int count_error(long long int chips,int chip_num, int match){
-	if(chip_num == 64)
-		return gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[match] & 0x7FFFFFFFFFFFFFFE));
-	else if(chip_num == 32)
-		return gr::blocks::count_bits32((chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[match] & 0x7FFFFFFE));
-	else if(chip_num == 16)	
-		return gr::blocks::count_bits16((chips & 0x7FFE) ^ (CHIP_MAPPING_2[match] & 0x7FFE));
-	else if(chip_num == 4)	
-		return gr::blocks::count_bits8((chips & 0x6) ^ (CHIP_MAPPING_3[match] & 0x6));
+	fprintf(stderr,"match is: %d\n",match);
+	if(match < 16){
+		if(chip_num == 64)
+			return gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[match] & 0x7FFFFFFFFFFFFFFE));
+		else if(chip_num == 32)
+			return gr::blocks::count_bits32((chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[match] & 0x7FFFFFFE));
+		else if(chip_num == 16)	
+			return gr::blocks::count_bits16((chips & 0x7FFE) ^ (CHIP_MAPPING_2[match] & 0x7FFE));
+		else if(chip_num == 4)	
+			return gr::blocks::count_bits8((chips & 0x6) ^ (CHIP_MAPPING_3[match] & 0x6));
+	}else{
+		return d_threshold;
+	}
 }
 
-int slice(float x) {
-	return x > 0 ? 1 : 0;
+int slice(float x){
+	return x>0?1:0;
 }
 
-double get_ber_value(){
-	return double(error_count)/bit_count;
+void compute_chip(double x,int index){
+	double d1 = fabs(x-1);
+	double d0 = fabs(x+1);
+	per_chip_0_pos[index] = d1/(d0+d1);
 }
 
-int8_t feedback_new_chip_num(int options){
-	//option = 0: increase optiaon = 1:decrease
-	//decrease part
-	if(options == 0){
-		//increase by 1
+void compute_per_bit(unsigned char x){
+	unsigned long long int table[16];
+	if(d_chip_num == 4){
+		for(int i = 0; i< 16;i++) table[i] = CHIP_MAPPING_3[i];
+	}
+	else if(d_chip_num == 16){
+		for(int i = 0; i< 16;i++) table[i] = CHIP_MAPPING_2[i];
+	}
+	else if(d_chip_num == 32){
+		for(int i = 0; i< 16;i++) table[i] = CHIP_MAPPING[i];
+	}
+	else if(d_chip_num == 64){
+		for(int i = 0; i< 16;i++) table[i] = CHIP_MAPPING_4[i];
+	}
+/*	
+	for(int j = 0; j < d_chip_num; j++){
+		fprintf(stderr,"%f ",per_chip_0_pos[j]);
+	}fprintf(stderr,"\n");
+	fprintf(stderr,"%d\n",x);
+	fprintf(stderr,"%x\n",d_shift_reg);
+*/
+	unsigned long long int sym = 0;
+	unsigned long long int c = 1;
+	double pos = 1;
+	for(int i = 0; i < 16;i++){
+		sym = table[i];
+		pos = 1;
+		sym = sym >> 1;		
+		for(int j = 1; j < d_chip_num-1;j++){
+			if(sym & 1 == 1){
+				pos *=2* (1-per_chip_0_pos[d_chip_num-j-1]);
+			}
+			else{
+				pos *= 2 * per_chip_0_pos[d_chip_num-j-1];
+			}
+			sym = sym >> 1;
+		}
+		per_bit_pos[i%d_chip_num] = pos;
+	}
+}
+
+double compute_be(int symbol,unsigned long long int chips){
+	double be = 0;
+	double p = 0;
+	double tmpmx = 0;
+	for(int i = 0; i < 16; i++){
+		p += per_bit_pos[i];
+	}
+	for(int i = 0; i < 16; i++){
+		per_bit_pos[i] = per_bit_pos[i] / p;
+		fprintf(stderr,"%f ",per_bit_pos[i]);
+	}fprintf(stderr,"\n");
+
+	int chiperrors = getChipDifferences(chips);
+	if(symbol != 0xff){
+		be = 4*(1-per_bit_pos[symbol])*w2;
+		be2[map(d_chip_num)] += be;
+		estimate_ber_for_remainings(1,chiperrors,be);
+		/*
+		for(int i = 0;i<16; i++){
+			if(per_bit_pos[i] > tmpmx){
+				tmpmx = per_bit_pos[i];
+			}
+				//be += 4*per_bit_pos[i]*count_error(chips,d_chip_num,i)/d_threshold;
+			
+		}
+		be = 4*(1-tmpmx);*/
+	}
+	else {
+		be = 4*w1;
+		be1[map(d_chip_num)] += be;
+		estimate_ber_for_remainings(0,chiperrors,be);
+	}
+	return be;
+}
+
+int getChipDifferences(unsigned long long int chips){
+	int min_threshold = 100;
+	int best_match = 0;
+	for(int i=0; i<16; i++) {
+		// FIXME: we can store the last chip
+		// ignore the first and last chip since it depends on the last chip.
+		//revision begins
+		unsigned int threshold;
+		if(d_chip_num == 32)
+			threshold = gr::blocks::count_bits32((chips & 0x7FFFFFFE) ^ (CHIP_MAPPING[i] & 0x7FFFFFFE));
+		else if(d_chip_num == 16)
+			threshold = gr::blocks::count_bits16((chips & 0x7FFE) ^( CHIP_MAPPING_2[i] & 0x7FFE));
+		else if(d_chip_num == 4)
+			threshold = gr::blocks::count_bits32((chips & 0x6) ^( CHIP_MAPPING_3[i] & 0x6));
+		else
+			threshold = gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^( CHIP_MAPPING_4[i] & 0x7FFFFFFFFFFFFFFE));
+		//revision ends
+		if (threshold < min_threshold) {
+			best_match = i;
+			min_threshold = threshold;
+		}
+	}
+	return min_threshold;
+}
+
+void SelectThreshold(int ){
+
+}
+
+void SelectRate(){
+	double be[4];
+	for(int i = 0; i < 4; i++){
+		be[i] = be1[i] + be2[i];
+	}
+	char feedback;
+	if(be[3] < ber_cost_upperbound){
+		feedback = 'D';
+	}
+	else if(be[2] < ber_cost_upperbound){
+		feedback = 'C';
+	}
+	else if(be[1] < ber_cost_upperbound){
+		feedback = 'B';
+	}
+	else
+		feedback = 'A';
+	FILE *tmpf = fopen("/home/captain/test/transceiver/rec_ack","w+");
+	fprintf(tmpf,"%c",feedback);
+	fclose(tmpf);
+}
+
+int map(int chip_num){
+	if(chip_num == 64)return 0;
+	else if(chip_num == 32) return 1;
+	else if(chip_num == 16) return 2;
+	else if(chip_num == 4) return 3;
+	else return -1;
+}
+
+int estimate_ber_for_remainings(int error_type, int chiperrors,double be2_pos){//error_type, 0 is ber1, 1 is ber2
+	double tmp;
+	int chip[4] = {64,32,16,4};
+	if(error_type == 1){	
+		for(int i = 0; i < 4; i++){
+			if(chip[i] != d_chip_num){
+				tmp = double(chip[i])/d_chip_num * chiperrors;
+				if(tmp > est_threshold[i]){
+					be1[i] += 4*w1;
+				}
+				else{
+					be2[i] += be2_pos;
+				}
+			}
+		}
 	}
 	else{
-		//decrease by 1
+		for(int i = 0; i < 4; i++){
+			if(chip[i] != d_chip_num){
+				tmp = double(chip[i])/d_chip_num * chiperrors;
+				if(tmp > est_threshold[i]){
+					be1[i] += 4*w1;
+				}
+				else{
+					be2[i] += 0;
+				}
+			}
+		}
 	}
-//	message_port_pub(pmt::mp("feedback out"),32);
-	//increase part
-	return 32;
+	return 0;
+}
+
+void receive_frame(){
+	estimated = fopen("/home/captain/experiment/cer-estimation/estimated","ab");
+
+	//fprintf(stderr,"======================\n");
+
+	received = fopen("/home/captain/experiment/ber-estimation/received","ab");
+	fprintf(received,"\n");
+	fclose(received);
+	fprintf(estimated,"%d\n",ce_preamble);
+	//fprintf(sequence,"\n");
+	fclose(estimated);
+	FILE *body_error = fopen("/home/captain/experiment/cer-estimation/bodyerror","ab");
+	fprintf(body_error,"%d\n",chip_errors);
+	fclose(body_error);
+	SelectThreshold(chip_errors);
+	SelectRate();	
+	chip_errors = 0;
+	sym_cnt = 0;
+	
+	 FILE *be_estimated = fopen("/home/captain/experiment/ber-estimation/estimated","ab");
+	 for(int i = 0; i < bct;i++){
+	 fprintf(be_estimated,"%f ",be[i]);
+	 }
+	 fprintf(be_estimated,"\n");
+	 fclose(be_estimated);
+	received_be = fopen("/home/captain/experiment/ber-estimation/received_be","ab");
+	fprintf(received_be,"\n");
+	fclose(received_be);
+	bct = 0;
+
+}
+
+void receive_symbol(unsigned long long int d_shift_reg,unsigned char c){
+	if(sym_cnt != 4 && sym_cnt != 5){
+		int tmpcnt = count_error(d_shift_reg,d_chip_num,c);
+		chip_errors += tmpcnt;
+		fprintf(stderr,"~%d\n~",tmpcnt);
+	}
+	sym_cnt++;
+	//	fprintf(stream2, "%d\n",c);
+	compute_per_bit(c);
+	be[bct] = compute_be(c,d_shift_reg);
+	//fprintf(stderr,"%d\n",c);
+	bct++;
+	received_be = fopen("/home/captain/experiment/ber-estimation/received_be","ab");
+	fprintf(received_be,"%d ",c);
+	fclose(received_be);
+
 }
 
 packet_sink_impl(int threshold,int chip_num)
@@ -247,10 +480,23 @@ packet_sink_impl(int threshold,int chip_num)
 	d_lqi = 0;
 	d_lqi_sample_count = 0;
 
+	d_head_threshold = 19;
+	ce_preamble = 0;
+	//d_threshold = 5;
 	if ( VERBOSE )
 		fprintf(stderr, "syncvec: %x, threshold: %d\n", d_sync_vector, d_threshold),fflush(stderr);
 	enter_search();
 
+	bct = 0;
+	chip_errors = 0;
+	sym_cnt = 0;
+	w1=1;
+	w2=1;
+	ber_cost_upperbound = 0;
+	est_threshold[0] = 18;
+	est_threshold[1] = 8;
+	est_threshold[2] = 5;
+	est_threshold[3] = 1;
 	message_port_register_out(pmt::mp("out"));
 	
 
@@ -258,6 +504,9 @@ packet_sink_impl(int threshold,int chip_num)
 
 ~packet_sink_impl()
 {
+	fclose(received);
+	fclose(estimated);
+	fclose(sequence);
 }
 
 int general_work(int noutput, gr_vector_int& ninput_items,
@@ -267,15 +516,20 @@ int general_work(int noutput, gr_vector_int& ninput_items,
     int ninput = ninput_items[0];
 	int count=0;
 	int i = 0;
+	
 	unsigned char new_chip_num = 0;
-
+	int ce_frame = 0;
+	int tmp_ce = 0;
+	int isFirst = 0;
+	
 	if (VERBOSE)
 		fprintf(stderr,">>> Entering state machine\n"),fflush(stderr);
 	while(count < ninput) {
 		switch(d_state) {
 
 		case STATE_SYNC_SEARCH:    // Look for sync vector
-			have_header = 0;
+		//	have_header = 0;
+			isFirst = 0;
 			if (VERBOSE)
 				fprintf(stderr,"SYNC Search, ninput=%d syncvec=%x\n", ninput, d_sync_vector),fflush(stderr);
 
@@ -292,8 +546,10 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					// The first if block syncronizes to chip sequences.
 					if(d_preamble_cnt == 0){
 						unsigned int threshold;
-						threshold = gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0x7FFFFFFE));
-						if(threshold < d_threshold) {
+						threshold = gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[0] & 0x7FFFFFFFFFFFFFFE));
+						if(threshold < d_head_threshold) {
+							ce_preamble = 0;
+							ce_preamble += threshold;
 							if (VERBOSE2)
 								fprintf(stderr,"Found 0 in chip sequence\n"),fflush(stderr);
 							// we found a 0 in the chip sequence
@@ -302,16 +558,20 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						}
 					} else {
 						// we found the first 0, thus we only have to do the calculation every 32 chips
-						if(d_chip_cnt == 32){
+						if(d_chip_cnt == 64){
 							d_chip_cnt = 0;
+							//unsigned char c = decode_chips(d_shift_reg);
+							//fprintf(stderr,"%d\n",c);
 							if(d_packet_byte == 0) {
-								if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[0] & 0xFFFFFFFE)) <= d_threshold) {
+								if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[0] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold) {
+									ce_preamble += gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[0] & 0xFFFFFFFFFFFFFFFE));
 									if (VERBOSE2)
 										fprintf(stderr,"Found %d 0 in chip sequence\n", d_preamble_cnt),fflush(stderr);
 									// we found an other 0 in the chip sequence
 									d_packet_byte = 0;
 									d_preamble_cnt ++;
-								}else if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[7] & 0xFFFFFFFE)) <= d_threshold) {
+								}else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[7] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold) {
+									ce_preamble += gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[7] & 0xFFFFFFFFFFFFFFFE));
 									if (VERBOSE2)
 										fprintf(stderr,"Found first SFD\n"),fflush(stderr);
 									d_packet_byte = 7 << 4;
@@ -324,10 +584,19 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									break;
 								}
 							} else {
-								if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[10] & 0xFFFFFFFE)) <= d_threshold
+								//fprintf(f,"%d\n",ce_preamble);
+								//fprintf(f,"%d\n",ce_preamble);
+							
+								//fclose(f);
+
+								if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[10] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold
 										) {
+									ce_preamble += gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[10] & 0xFFFFFFFFFFFFFFFE));	
+								//	fprintf(f,"%d\n",ce_preamble);
+								//	fclose(f);
 									d_packet_byte |= 0xA;
 									d_chip_num = 64;
+									d_threshold = 18;
 									if (VERBOSE2)
 										fprintf(stderr,"Found sync, 0x%x\n", d_packet_byte),fflush(stderr);
 									// found SDF
@@ -335,30 +604,47 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									enter_have_sync();
 									break;
 								}
-								else if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[11] & 0xFFFFFFFE)) <= d_threshold){
+								else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[11] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold){
+							//		fprintf(f,"%d\n",ce_preamble);
+									
+									ce_preamble += gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[11] & 0xFFFFFFFFFFFFFFFE));
+							//		fprintf(f,"%d\n",ce_preamble);
+								//	fclose(f);
 									d_packet_byte |= 0xB;
 									d_chip_num = 32;
+									d_threshold = 8;
 									enter_have_sync();
 									break;
 								}
-								else if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[12] & 0xFFFFFFFE)) <= d_threshold){
+								else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[12] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold){
+									ce_preamble += 	gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[12] & 0xFFFFFFFFFFFFFFFE));
+									fprintf(stderr,"?\n");
+							//		fprintf(f,"%d\n",ce_preamble);
+								//	fclose(f);
 									d_packet_byte |= 0xC;
 									d_chip_num = 16;
+									d_threshold = 5;
 									enter_have_sync();
 									break;
 								}
-								else if (gr::blocks::count_bits32((d_shift_reg & 0x7FFFFFFE) ^ (CHIP_MAPPING[13] & 0xFFFFFFFE)) <= d_threshold){
+								else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[13] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold){
+									ce_preamble +=  gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[13] & 0xFFFFFFFFFFFFFFFE));
+			//						fprintf(f,"%d\n",ce_preamble);
+								//	fclose(f);
 									d_packet_byte |= 0xD;
 									d_chip_num = 4;
+									d_threshold = 1;
 									enter_have_sync();
 									break;
 								}
 								 else {
+									// fprintf(f,"%d\n",ce_preamble+15);
 									if (VERBOSE)
 										fprintf(stderr, "Wrong second byte of SFD. %u\n", d_shift_reg), fflush(stderr);
-									enter_search();
-									break;
+								//	enter_search();
+								//	break;
 								}
+								 //fprintf(stderr,"!\n");
 							}
 						}
 					
@@ -369,7 +655,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 
 		case STATE_HAVE_SYNC:
 			have_header = 0;
-			reset_ber();
+			//fprintf(stderr,"%d\n",ce_preamble);
+			//reset_ber();
 			if (VERBOSE2)
 				fprintf(stderr,"Header Search bitcnt=%d, header=0x%08x\n", d_headerbitlen_cnt, d_header),
 				fflush(stderr);
@@ -391,8 +678,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
 
-							enter_search();
-							break;
+							//enter_search();
+							//break;
 						}
 
 						if(d_packet_byte_index == 0){
@@ -408,7 +695,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(frame_len <= MAX_PKT_LEN){
 								enter_have_header(frame_len);
 							} else {
-								enter_search();
+								enter_have_header(32);
+								//enter_search();
 							}
 							break;
 						}
@@ -425,17 +713,16 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
-
-							enter_search();
-							break;
+				//			enter_search();
+				//			break;
 						}
 
 						if(d_packet_byte_index == 0){
 							d_packet_byte = c;
 						} else {
-							// c is always < 15
 							d_packet_byte |= c << 4;
 						}
+						d_packet_byte = 32;
 						d_packet_byte_index = d_packet_byte_index + 1;
 						if(d_packet_byte_index%2 == 0){
 							// we have a complete byte which represents the frame length.
@@ -443,14 +730,15 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(frame_len <= MAX_PKT_LEN){
 								enter_have_header(frame_len);
 							} else {
-								enter_search();
+								enter_have_header(32);
+								//enter_search();
 							}
 							break;
 						}
 					}
 				}
 				else if(d_chip_num == 4){
-					if(d_chip_cnt == 4){
+					if(d_chip_cnt == 4+2){
 						d_chip_cnt = 0;
 						unsigned char c = decode_chips(d_shift_reg);
 						//fprintf(stream2,"%d\n",c);
@@ -460,8 +748,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
 
-							enter_search();
-							break;
+							//enter_search();
+							//break;
 						}
 
 						if(d_packet_byte_index == 0){
@@ -477,7 +765,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(frame_len <= MAX_PKT_LEN){
 								enter_have_header(frame_len);
 							} else {
-								enter_search();
+								enter_have_header(32);
+								//enter_search();
 							}
 							break;
 						}
@@ -495,8 +784,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
 
-							enter_search();
-							break;
+							//enter_search();
+							//break;
 						}
 
 						if(d_packet_byte_index == 0){
@@ -512,7 +801,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							if(frame_len <= MAX_PKT_LEN){
 								enter_have_header(frame_len);
 							} else {
-								enter_search();
+								enter_have_header(32);
+								//enter_search();
 							}
 							break;
 						}
@@ -526,27 +816,32 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			have_header = 1;
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
-
 			while (count < ninput) {   // shift bits into bytes of packet one at a time				
-				if(slice(inbuf[count++]))
+				if(slice(inbuf[count])){
 					d_shift_reg = (d_shift_reg << 1) | 1;
-				else
+					compute_chip(inbuf[count],d_chip_cnt);	
+					count++;
+					//fprintf(stderr,"%f\n",inbuf[count-1]);
+				}
+				else{
 					d_shift_reg = d_shift_reg << 1;
-				
+					compute_chip(inbuf[count],d_chip_cnt);
+					count++;
+					//fprintf(stderr,"%f\n",inbuf[count-1]);
+				}
 				if(d_chip_num == 32){
 					d_chip_cnt = (d_chip_cnt+1)%32;
-				
+		
 					if(d_chip_cnt == 0){
-						bit_count += 32;
 						unsigned char c = decode_chips(d_shift_reg);
-						
+						receive_symbol(d_shift_reg,c);				
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
-
-							enter_search();
-							break;
+							c = 0;
+						//	enter_search();
+						//	break;
 						}
 						// the first symbol represents the first part of the byte.
 						if(d_packet_byte_index == 0){
@@ -567,6 +862,9 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							d_packet_byte_index = 0;
 
 							if (d_payload_cnt >= d_packetlen){	// packet is filled, including CRC. might do check later in here
+								receive_frame();
+								
+								
 								unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
 								unsigned char lqi = (scaled_lqi >= 256? 255 : scaled_lqi);
 								//new_chip_num = 16;
@@ -578,8 +876,10 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 								//my code
-
+								fprintf(received,"\n");
+								fprintf(sequence,"\n");
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
+								fprintf(stderr,"Error chip number is: %d\n",error_count);
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);
@@ -592,19 +892,20 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 				}
 				//my revision
 				else if(d_chip_num == 16){
+					
 					d_chip_cnt = (d_chip_cnt+1)%16;
 				
 					if(d_chip_cnt == 0){
-						bit_count += 16;
-						unsigned char c = decode_chips(d_shift_reg);
-					//	fprintf(stream2, "%d\n",c);
+					//	fprintf(stderr,"%d\n",ce_preamble);
+						unsigned char c = decode_chips(d_shift_reg);	
+						receive_symbol(d_shift_reg,c);
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
-
-							enter_search();
-							break;
+							c=0;
+					//		enter_search();
+					//		break;
 						}
 						// the first symbol represents the first part of the byte.
 						if(d_packet_byte_index == 0){
@@ -625,6 +926,9 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							d_packet_byte_index = 0;
 
 							if (d_payload_cnt >= d_packetlen){	// packet is filled, including CRC. might do check later in here
+								receive_frame();
+								
+								
 								unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
 								unsigned char lqi = (scaled_lqi >= 256? 255 : scaled_lqi);
 
@@ -635,6 +939,9 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
+								fprintf(stderr,"Error chip number is: %d\n",error_count);
+								//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
+								//fclose(f);
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);
@@ -646,18 +953,18 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					}
 				}
 				else if(d_chip_num == 4){
-					d_chip_cnt = (d_chip_cnt+1)%4;
+					d_chip_cnt = (d_chip_cnt+1)%6;
 				
 					if(d_chip_cnt == 0){
-						bit_count += 4;
 						unsigned char c = decode_chips(d_shift_reg);
+						receive_symbol(d_shift_reg,c);
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
-
-							enter_search();
-							break;
+							c = 0;
+							//enter_search();
+							//break;
 						}
 						// the first symbol represents the first part of the byte.
 						if(d_packet_byte_index == 0){
@@ -678,6 +985,9 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							d_packet_byte_index = 0;
 
 							if (d_payload_cnt >= d_packetlen){	// packet is filled, including CRC. might do check later in here
+								receive_frame();
+								
+								
 								unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
 								unsigned char lqi = (scaled_lqi >= 256? 255 : scaled_lqi);
 
@@ -688,6 +998,10 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
+								fprintf(stderr,"Error chip number is: %d\n",error_count);
+							//	FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
+								fprintf(received,"\n");
+								//fclose(f);
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);
@@ -705,14 +1019,16 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					if(d_chip_cnt == 0){
 						bit_count += 64;
 						unsigned char c = decode_chips(d_shift_reg);
-					//	fprintf(stream2, "%d\n",c);
+						receive_symbol(d_shift_reg,c);
+					
+						
 						if(c == 0xff){
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
-								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
-
-							enter_search();
-							break;
+								fprintf(stderr, "Found a not valid chip sequence! %llx, ori: %llx\n", d_shift_reg,CHIP_MAPPING_4[8]), fflush(stderr);
+							c = 0;
+							//enter_search();
+							//break;
 						}
 						// the first symbol represents the first part of the byte.
 						if(d_packet_byte_index == 0){
@@ -733,6 +1049,8 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							d_packet_byte_index = 0;
 
 							if (d_payload_cnt >= d_packetlen){	// packet is filled, including CRC. might do check later in here
+								receive_frame();
+								
 								unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
 								unsigned char lqi = (scaled_lqi >= 256? 255 : scaled_lqi);
 
@@ -743,6 +1061,12 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
+								//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
+								fprintf(received,"\n");
+								fprintf(sequence,"\n");
+							//	fclose(f);
+
+								fprintf(stderr,"Error chip number is: %d\n",error_count);
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);
@@ -757,12 +1081,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			}
 
 			//ber check will be put here
-		//	if(get_ber_value() > ber_threshold)
-		//	fprintf(stderr,"header\n");
-//			new_chip_num = feedback_new_chip_num(0);
-		//	new_chip_num = 16;
-//			feedback_out[0] = new_chip_num;
-		//	else if("time % 100 = 0")
 			break;
 
 		default:
@@ -775,14 +1093,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 		fprintf(stderr, "Samples Processed: %d\n", ninput_items[0]), fflush(stderr);
 
         consume(0, ninput_items[0]);
-	if(new_chip_num != 0) 
-	{	
-		FILE *ack_file = fopen("/home/captain/test/receiver/ack","w+");
-		fprintf(ack_file,"%d",new_chip_num);
-		fclose(ack_file);	
-	}
-
-
+	//fclose(sequence);
 	return 0;
 }
 
@@ -815,6 +1126,27 @@ private:
 	unsigned int	  error_count;			  //errors per packet
 	unsigned int	  bit_count;				//bit count in a data stream
 	unsigned int	  ber_threshold;			//over the threshold we should lower the d_chip_num
+	
+	int				  d_head_threshold;	
+	FILE*			  received;
+	FILE*			  sequence;
+	FILE*			  estimated;
+	int				  ce_preamble;
+	double			  per_chip_0_pos[64];
+	double			  per_bit_pos[16];
+	int				  chip_ct;
+	int				  bct;
+	double					be[256];
+	FILE*			  received_be;
+	int				  chip_errors;
+	int				sym_cnt;
+	double			w1;
+	double			w2;
+	double			ber_cost_upperbound;
+	double			ber_cost;
+	double			be1[4];
+	double			be2[4];
+	int				est_threshold[4];
 	// FIXME:
 	char buf[256];
 };

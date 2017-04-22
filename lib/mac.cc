@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 
 using namespace gr::ieee802_15_4;
 
@@ -42,6 +43,10 @@ mac_impl(bool debug,bool is_sender) :
 			d_num_packets_received(0),
 			d_is_sender(is_sender){
 
+
+	ack_num = 0;
+	seq1_num = 0;
+	seq2_num = 0;
 	message_port_register_in(pmt::mp("app in"));
 	set_msg_handler(pmt::mp("app in"), boost::bind(&mac_impl::app_in, this, _1));
 	message_port_register_in(pmt::mp("pdu in"));
@@ -71,7 +76,7 @@ void mac_in(pmt::pmt_t msg) {
 	}
 	
 	unsigned char* buf = (unsigned char*)pmt::blob_data(blob);
-	fprintf(stderr,"%d   %d\n",int(buf[9]), int(d_is_sender));
+//	fprintf(stderr,"%d   %d\n",int(buf[9]), int(d_is_sender));
 	
 	for(int i = 0; i < data_len; i++){
 		std::cout << int(buf[i])  << " ";
@@ -80,8 +85,10 @@ void mac_in(pmt::pmt_t msg) {
 
 
 
+//	fprintf(stderr,"%d %d\n",d_is_sender,buf[9]);
 	if((buf[9] == 0xcd && !d_is_sender) || (buf[9] == 0x29 && d_is_sender))
 	{
+
 		uint16_t crc = crc16((char*)pmt::blob_data(blob), data_len);
 		d_num_packets_received++;
 		if(crc) {
@@ -103,17 +110,54 @@ void mac_in(pmt::pmt_t msg) {
 //	std::cout << (char*)pmt::blob_data(blob) << std::endl;
 		message_port_pub(pmt::mp("app out"), pmt::cons(pmt::PMT_NIL, mac_payload));
 		FILE *f;
-		if(buf[9] == 0xcd && !d_is_sender){
+		if(buf[9] == 0xcd && !d_is_sender){//2 sends, 1 receives, now 1 receives
 			//write 0
-			f = fopen("/home/captain/test/case","w+");
-			fprintf(f,"%d",0);
+			f = fopen("/home/captain/test/transceiver/rec_ack","w+");
+			fprintf(f,"%c",buf[19]);
 			fclose(f);
+/*
+			int x;
+			f = fopen("/home/captain/test/seq/seq_2","r");
+			fscanf(f,"%d",&x);
+			fclose(f);
+			x++;*/
+			seq2_num++;
+			while(1){
+				if(f = fopen("/home/captain/test/seq/seq_2","w+")){
+					fprintf(f,"%d",seq2_num);
+					fclose(f);
+					break;
+				}
+			}	
+			/*
+			for(int i = 0; i < data_len; i++){
+				std::cout << int(buf[i])  << " ";
+			}
+			std::cout << std::endl;*/
 		}
-		else{
-			//write 0
-			f = fopen("/home/captain/test/case","w+");
-			fprintf(f,"%d",1);
+		else{//1 sends, 2 receives, now 2 receives
+			//write 1
+			ack_num++;
+
+			f = fopen("/home/captain/test/acknum","w+");
+			fprintf(f,"%d",ack_num);
 			fclose(f);
+				
+			/*
+			int x;
+			f = fopen("/home/captain/test/seq/seq_1","r");//the received packets from 1 increase
+			fscanf(f,"%d",&x);
+			fclose(f);
+			x++;*/
+			seq1_num++;
+			while(1){
+				if(f = fopen("/home/captain/test/seq/seq_1","w+"))
+				{
+					fprintf(f,"%d",seq1_num);
+					fclose(f);
+					break;
+				}
+			}
 		}
 
 	}
@@ -207,6 +251,11 @@ void generate_mac(const char *buf, int len) {
 		d_msg[13] = 0x40;
 		d_msg[14] = 0xe8;
 	}
+	/*
+	std::cout <<"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << std::endl;
+	for(int i = 0; i < strlen(buf);i++){
+		std::cout << buf[i]  << " ";
+	}std::cout << std::endl;*/
 	std::memcpy(d_msg + 15, buf, len);
 
 	uint16_t crc = crc16(d_msg, len + 15);
@@ -240,6 +289,11 @@ private:
 	uint8_t     d_seq_nr;
 	char        d_msg[256];
 	bool		d_is_sender;
+
+
+	int ack_num;
+	int seq1_num;
+	int seq2_num;
 
 	int d_num_packet_errors;
 	int d_num_packets_received;

@@ -161,26 +161,25 @@ class transceiver_OQPSK(gr.top_block, Qt.QWidget):
         self.top_layout.addWidget(self._qtgui_freq_sink_x_0_win)
         self.ieee802_15_4_rime_stack_0 = ieee802_15_4.rime_stack(([129]), ([131]), ([132]), ([23,42]))
         self.ieee802_15_4_oqpsk_phy_0 = ieee802_15_4_oqpsk_phy()
-        self.ieee802_15_4_message_feedback_0 = ieee802_15_4.message_feedback()
         self.ieee802_15_4_mac_0 = ieee802_15_4.mac(True,True)
         self.foo_wireshark_connector_1_0_0 = foo.wireshark_connector(195, False)
         self.foo_wireshark_connector_1_0 = foo.wireshark_connector(195, False)
         self.foo_wireshark_connector_1 = foo.wireshark_connector(195, False)
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("B"), 1000)
+        #self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("I"), 1000)
         self.blocks_file_sink_1_0_0 = blocks.file_sink(gr.sizeof_char*1, "/tmp/sensorPDURec.pcap", False)
         self.blocks_file_sink_1_0_0.set_unbuffered(True)
         self.blocks_file_sink_1_0 = blocks.file_sink(gr.sizeof_char*1, "/tmp/sensorAppRec.pcap", False)
         self.blocks_file_sink_1_0.set_unbuffered(True)
         self.blocks_file_sink_1 = blocks.file_sink(gr.sizeof_char*1, "/tmp/sensor.pcap", False)
         self.blocks_file_sink_1.set_unbuffered(True)
-
+        self.ieee802_15_4_message_generator_0 = ieee802_15_4.message_generator()
         ##################################################
         # Connections
         ##################################################
-        self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.ieee802_15_4_rime_stack_0, 'bcin'))    
+        #self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.ieee802_15_4_rime_stack_0, 'bcin'))    
+        self.msg_connect((self.ieee802_15_4_message_generator_0, 'strobe'), (self.ieee802_15_4_rime_stack_0, 'bcin'))    
         self.msg_connect((self.ieee802_15_4_mac_0, 'pdu out'), (self.foo_wireshark_connector_1, 'in'))    
-        self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.foo_wireshark_connector_1_0, 'in'))    
-        self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.ieee802_15_4_message_feedback_0, 'from pdu in'))    
+        self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.foo_wireshark_connector_1_0, 'in'))       
         self.msg_connect((self.ieee802_15_4_mac_0, 'pdu out'), (self.ieee802_15_4_oqpsk_phy_0, 'txin'))    
         self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.ieee802_15_4_rime_stack_0, 'fromMAC'))    
         self.msg_connect((self.ieee802_15_4_oqpsk_phy_0, 'rxout'), (self.foo_wireshark_connector_1_0_0, 'in'))    
@@ -349,14 +348,14 @@ class transceiver_OQPSK_th2(gr.top_block, Qt.QWidget):
         self.top_layout.addWidget(self._qtgui_freq_sink_x_0_win)
         self.ieee802_15_4_rime_stack_0 = ieee802_15_4.rime_stack(([129]), ([131]), ([132]), ([23,42]))
         self.ieee802_15_4_oqpsk_phy_0 = ieee802_15_4_oqpsk_phy()
-        self.ieee802_15_4_message_feedback_0 = ieee802_15_4.message_feedback()
+        self.ieee802_15_4_feedback_generator_0 = ieee802_15_4.feedback_generator()
         self.ieee802_15_4_mac_0 = ieee802_15_4.mac(True,False)
         self.foo_wireshark_connector_1_0_0 = foo.wireshark_connector(195, False)
         self.foo_wireshark_connector_1_0 = foo.wireshark_connector(195, False)
         self.foo_wireshark_connector_1 = foo.wireshark_connector(195, False)
         
         #
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("A"), 1000)
+        #self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("A"), 1000)
         #
         '''
         self.blocks_file_sink_1_0_0 = blocks.file_sink(gr.sizeof_char*1, "/tmp/sensorPDURec.pcap", False)
@@ -369,10 +368,11 @@ class transceiver_OQPSK_th2(gr.top_block, Qt.QWidget):
         ##################################################
         # Connections
         ##################################################
-        self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.ieee802_15_4_rime_stack_0, 'bcin'))    
+  	self.msg_connect((self.ieee802_15_4_feedback_generator_0, 'out to RS'), (self.ieee802_15_4_rime_stack_0, 'bcin'))          
+	#self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.ieee802_15_4_rime_stack_0, 'bcin'))    
         #self.msg_connect((self.ieee802_15_4_mac_0, 'pdu out'), (self.foo_wireshark_connector_1, 'in'))    
         #self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.foo_wireshark_connector_1_0, 'in'))    
-        self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.ieee802_15_4_message_feedback_0, 'from pdu in'))    
+        #self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.ieee802_15_4_message_feedback_0, 'from pdu in'))    
         self.msg_connect((self.ieee802_15_4_mac_0, 'pdu out'), (self.ieee802_15_4_oqpsk_phy_0, 'txin'))    
         self.msg_connect((self.ieee802_15_4_mac_0, 'app out'), (self.ieee802_15_4_rime_stack_0, 'fromMAC'))    
         #self.msg_connect((self.ieee802_15_4_oqpsk_phy_0, 'rxout'), (self.foo_wireshark_connector_1_0_0, 'in'))    
@@ -424,10 +424,15 @@ class transceiver_OQPSK_th2(gr.top_block, Qt.QWidget):
 
 
 def main(top_block_cls=transceiver_OQPSK, options=None):
-    case = 0
     isFirst = 1
-    flag_1 = 0
     isSecond = 0
+    flag_1 = 0
+    seq=0
+    seq2=0
+    prev_seq=0
+    prev_seq2=0
+   
+    pac_num = 0
 
 
     top_clock_ack = transceiver_OQPSK_th2;
@@ -443,55 +448,160 @@ def main(top_block_cls=transceiver_OQPSK, options=None):
 
     print "working!!!!!!!!"
 
+    f = open('/home/captain/test/seq/seq_1','w+')
+    f.write("0")
+    f.close()
+    f = open('/home/captain/test/seq/seq_2','w+')
+    f.write("0")
+    f.close()
+    f2 = open('/home/captain/test/acknum','w+')
+    f2.write("0")
+    f2.close()
+    f2 = open('/home/captain/test/transceiver/seq_num',"w+")
+    f2.write("0")
+    f2.close()
+    f3 = open('/home/captain/test/transceiver/send_num',"w")
     tb = top_block_cls()
     tb2 = top_clock_ack()
+    road = 0;
+    t=2000;
+    k = 2000;
+#seq represents the number of received packets by 2 from 1
+#seq2 represents the # of received packets by 1 from 2
     while True:
         if isFirst == 1:
+            print "===============first in==================="
+            pac_num = pac_num + 1
+            isFirst = 0
+            t = k
+            print "pac num is:" + str(pac_num)
+            tb.start()
+
+        if prev_seq == seq - 1 and isFirst == 0:
+            print "===============send packet================"
+            pac_num = pac_num + 1
+            prev_seq = seq
+            print "pac num is:" + str(pac_num)
+            t = k
+            tb.lock()
+            tb.unlock()
+
+        if t == 0 and isFirst == 0:
+            print "==============retransmit=================="
+            pac_num = pac_num + 1
+            prev_seq = seq
+            print "pac num is:" + str(pac_num)
+            t = k
+            tb.lock()
+            tb.unlock()
+        t = t - 1
+        time.sleep(0.005)
+        f = open('/home/captain/test/seq/seq_1','r')
+        str2 = f.read()
+        if str2:
+            seq = int(str2)
+    
+    def quitting():
+        tb.stop()
+        tb.wait()
+      #  print "pac_num: " + str(pac_num)
+    qapp.connect(qapp, Qt.SIGNAL("aboutToQuit()"), quitting)
+    qapp.exec_()
+        
+
+'''         
+        if isFirst == 1:
             print "==============first in===================="
+            road = 0
             isFirst = 0
             isSecond = 1
+            t = k
+            pac_num = pac_num + 1
+            print "pac num is:" + str(pac_num)
             tb.start()
-        if case == 1 and isSecond == 1 and isFirst == 0:
+        if prev_seq == seq-1 and isSecond == 1 and isFirst == 0:
             print "==============Second in==================="
+            road = 1
             isSecond = 0
             flag_1 = 0
+            prev_seq = seq
+            t = k
+            
+          
             tb.lock()#lock means it stop until we unlock it
             tb2.start()
-        if flag_1 == 0 and case == 0 and isFirst == 0 and isSecond == 0:
-            print "==============data packet working============"
+        if prev_seq2 == seq2-1 and isFirst == 0 and isSecond == 0:
+            print "==============data packet working1============"
+            road = 2
             tb2.lock()
             flag_1 = 1
+            prev_seq2 = seq2
+            t = k
+            pac_num = pac_num + 1
+            print "pac num is:" + str(pac_num)    
             tb.unlock()
-        if flag_1 == 1 and case == 1 and isFirst == 0 and isSecond == 0:
+        if prev_seq == seq-1 and isFirst == 0 and isSecond == 0:
             print "=============ack working=================="
+            road = 3
             tb.lock()
-            flag_1 = 0
+            t = k
+            prev_seq = seq
+            flag_1 = 0 
             tb2.unlock()
-        print "main loop "
-        time.sleep(0.5)
-        f = open('/home/captain/test/case','r')
+        time.sleep(0.0002)
+        f = open('/home/captain/test/seq/seq_1','r')
+        f2 = open('/home/captain/test/seq/seq_2','r')
         str1 = f.read()
-        case2 = int(str1)
+        str2 = f2.read()
+        if str1:
+            seq = int(str1)
+        if str2:
+            seq2 = int(str2)
        # print "================="
-        print "("+str(case2)+','+str(case) + ')'
+            #print "("+str(case2)+','+str(case) + ')'
        # print "================="
-        if case2 == 1 and case == 0:
-            flag_1 = 1
-            case = case2
-        if case2 == 0 and case == 1:
-            flag_1 = 0
-            case = case2
+        f.close()
+        f2.close()
+        if t == 0:
+            print str(seq)+","+str(seq2)
+            if road == 0 or road == 2:#stuck in state 0 or 2
+                print "=============data packet working2==========================================================="
+                pac_num = pac_num+1
+                print "pac num is:" + str(pac_num)
+                
+             
+                tb.lock()
+                road = 2
+                t = k
+                prev_seq = seq
+                prev_seq2 = seq2
+                seq2 = 0
+                tb.unlock()
+            if road == 1 or road == 3:#stuck in state 1 or 3
+                print "=============data packet working3============================================================"
+                pac_num = pac_num + 1
+                print "pac num is:" + str(pac_num)
+                tb2.lock()
+                road = 2
+                t = k
+                prev_seq = seq
+                prev_seq2 = seq2
+                tb.unlock()
+            isFirst = 0
+            isSecond = 0
+        t = t - 1
 
    # tb.starts()
    # tb.show()
-    print "I feel so sad"
+
 
     def quitting():
         tb.stop()
         tb.wait()
+      #  print "pac_num: " + str(pac_num)
     qapp.connect(qapp, Qt.SIGNAL("aboutToQuit()"), quitting)
     qapp.exec_()
-
+'''
 
 if __name__ == '__main__':
     main()

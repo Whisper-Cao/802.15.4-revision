@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<block>
+	<name>Message Generator</name>
+	<key>ieee802_15_4_message_generator</key>
+	<category>[IEEE802.15.4]</category>
+	<import>import ieee802_15_4</import>
+	<make>ieee802_15_4.message_generator()</make>
+
+	<source>
+		<name>strobe</name>
+		<type>message</type>
+	</source>
+
+</block>

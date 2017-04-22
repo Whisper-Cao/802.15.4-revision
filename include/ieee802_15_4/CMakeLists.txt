@@ -41,8 +41,9 @@ install(FILES
     zeropadding_b.h
     zeropadding_removal_b.h
     chunks_to_symbols.h
-    message_feedback.h
     renew_chip_num.h
+    message_generator.h
+    feedback_generator.h
     DESTINATION ${GR_INCLUDE_DIR}/gnuradio/ieee802_15_4
     COMPONENT "ieee802_15_4_devel"
 )

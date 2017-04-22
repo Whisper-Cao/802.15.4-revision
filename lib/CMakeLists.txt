@@ -50,8 +50,9 @@ list(APPEND ieee802_15_4_sources
     zeropadding_b_impl.cc
     zeropadding_removal_b_impl.cc
     chunks_to_symbols_impl.cc
-    message_feedback.cc
     renew_chip_num.cc
+    message_generator_impl.cc
+    feedback_generator_impl.cc
 )
 
 list(APPEND ieee802_15_4_libs

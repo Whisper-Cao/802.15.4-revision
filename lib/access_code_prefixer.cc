@@ -37,6 +37,13 @@ class access_code_prefixer_impl : public access_code_prefixer {
 	    message_port_register_in(pmt::mp("in"));
 	    set_msg_handler(pmt::mp("in"), boost::bind(&access_code_prefixer_impl::make_frame, this, _1));
 
+	}
+
+	~access_code_prefixer_impl() {
+
+	}
+
+	void make_frame (pmt::pmt_t msg) {
 		char tmp[5];
 		FILE *f = fopen("/home/captain/test/transceiver/rec_ack","r");
 		fscanf(f,"%s",tmp);
@@ -55,13 +62,7 @@ class access_code_prefixer_impl : public access_code_prefixer {
 			buf[4] = 0xD7;//4bit
 		else
 			buf[4] = 0xB7;//default 32bit
-	}
-
-	~access_code_prefixer_impl() {
-
-	}
-
-	void make_frame (pmt::pmt_t msg) {
+		fprintf(stderr,"%c\n",tmp[0]);
 
 		if(pmt::is_eof_object(msg)) {
 			message_port_pub(pmt::mp("out"), pmt::PMT_EOF);
