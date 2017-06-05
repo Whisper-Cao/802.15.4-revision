@@ -28,7 +28,7 @@ public:
 	chunks_to_symbols_impl();
 	~chunks_to_symbols_impl();
 
-	int symbol_table_init(int d);
+	int symbol_table_init();
 	int work(int noutput_items,
 			gr_vector_const_void_star &input_items,
 			gr_vector_void_star &output_items);

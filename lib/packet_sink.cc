@@ -167,7 +167,7 @@ unsigned char decode_chips(unsigned long long int chips){
 		else if(d_chip_num == 16)
 			threshold = gr::blocks::count_bits16((chips & 0x7FFE) ^( CHIP_MAPPING_2[i] & 0x7FFE));
 		else if(d_chip_num == 4)
-			threshold = gr::blocks::count_bits32((chips & 0x6) ^( CHIP_MAPPING_3[i] & 0x6));
+			threshold = gr::blocks::count_bits32((chips & 0x1E) ^( CHIP_MAPPING_3[i] & 0x1E));
 		else
 			threshold = gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^( CHIP_MAPPING_4[i] & 0x7FFFFFFFFFFFFFFE));
 		//revision ends
@@ -176,7 +176,8 @@ unsigned char decode_chips(unsigned long long int chips){
 			min_threshold = threshold;
 		}
 	}
-	unsigned long long x_chips;
+	unsigned long long x_chips= chips;
+	
 	if(d_chip_num == 32){
 		x_chips = chips & 0xFFFFFFFF;
 	}
@@ -184,9 +185,9 @@ unsigned char decode_chips(unsigned long long int chips){
 		x_chips = chips &0xFFFF;
 	}
 	else if(d_chip_num == 4){
-		x_chips = chips & 0xF;
+		x_chips = chips & 0x1E;
 	}
-	received = fopen("/home/captain/experiment/ber-estimation/received","ab");
+	received = fopen("/home/captain/experiment/snr/received","ab");
 
 	fprintf(received,"%llx  ",x_chips);
 	fclose(received);
@@ -202,7 +203,7 @@ unsigned char decode_chips(unsigned long long int chips){
 		}else if(flag && d_chip_num == 16){
 				fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7FFE) ^ (CHIP_MAPPING_2[best_match] & 0x7FFE)), fflush(stderr);
 		}else if(flag && d_chip_num == 4){
-			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x7E) ^ (CHIP_MAPPING_3[best_match] & 0x7E)), fflush(stderr);			
+			fprintf(stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, (chips & 0x1E) ^ (CHIP_MAPPING_3[best_match] & 0x1E)), fflush(stderr);			
 		}else if(flag && d_chip_num == 64){
 			fprintf(stderr, "Found sequence with %d errors at 0x%x, send: %x,receive:%x\n", min_threshold, (chips & 0x7FFFFFFFFFFFFFF0) ^ (CHIP_MAPPING_4[best_match]), fflush(stderr));
 		}
@@ -218,15 +219,11 @@ unsigned char decode_chips(unsigned long long int chips){
 	//	fprintf(received,"%llx ",chips);
 	}
 
-	//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
-	//fprintf(stderr,"!\n");
-	//fprintf(stderr,"%llx ",chips);
-	//fclose(f);
 	return 0xFF;
 }
 
 unsigned int count_error(long long int chips,int chip_num, int match){
-	fprintf(stderr,"match is: %d\n",match);
+	//fprintf(stderr,"match is: %d\n",(chips & 0x1F));
 	if(match < 16){
 		if(chip_num == 64)
 			return gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[match] & 0x7FFFFFFFFFFFFFFE));
@@ -235,7 +232,7 @@ unsigned int count_error(long long int chips,int chip_num, int match){
 		else if(chip_num == 16)	
 			return gr::blocks::count_bits16((chips & 0x7FFE) ^ (CHIP_MAPPING_2[match] & 0x7FFE));
 		else if(chip_num == 4)	
-			return gr::blocks::count_bits8((chips & 0x6) ^ (CHIP_MAPPING_3[match] & 0x6));
+			return gr::blocks::count_bits8((chips & 0x1E) ^ (CHIP_MAPPING_3[match] & 0x1E));
 	}else{
 		return d_threshold;
 	}
@@ -275,20 +272,22 @@ void compute_per_bit(unsigned char x){
 	unsigned long long int sym = 0;
 	unsigned long long int c = 1;
 	double pos = 1;
+	int dd = d_chip_num;
+	if(dd == 4) dd = 6;
 	for(int i = 0; i < 16;i++){
 		sym = table[i];
 		pos = 1;
 		sym = sym >> 1;		
-		for(int j = 1; j < d_chip_num-1;j++){
+		for(int j = 1; j < dd-1;j++){
 			if(sym & 1 == 1){
-				pos *=2* (1-per_chip_0_pos[d_chip_num-j-1]);
+				pos *=8* (1-per_chip_0_pos[dd-j-1]);
 			}
 			else{
-				pos *= 2 * per_chip_0_pos[d_chip_num-j-1];
+				pos *= 8 * per_chip_0_pos[dd-j-1];
 			}
 			sym = sym >> 1;
 		}
-		per_bit_pos[i%d_chip_num] = pos;
+		per_bit_pos[i%16] = pos;
 	}
 }
 
@@ -299,14 +298,16 @@ double compute_be(int symbol,unsigned long long int chips){
 	for(int i = 0; i < 16; i++){
 		p += per_bit_pos[i];
 	}
+	FILE *f_prob = fopen("/home/captain/experiment/ber-estimation/probability","ab");
 	for(int i = 0; i < 16; i++){
 		per_bit_pos[i] = per_bit_pos[i] / p;
-		fprintf(stderr,"%f ",per_bit_pos[i]);
-	}fprintf(stderr,"\n");
-
+		fprintf(f_prob,"%f ",per_bit_pos[i]);
+	}
+	fclose(f_prob);
 	int chiperrors = getChipDifferences(chips);
-	if(symbol != 0xff){
-		be = 4*(1-per_bit_pos[symbol])*w2;
+	if(symbol <= 15){
+		be = 2*ber2_impact_adj((1-per_bit_pos[symbol]))*w2;
+		//`be = 4*(1-per_bit_pos[symbol])*w2;
 		be2[map(d_chip_num)] += be;
 		estimate_ber_for_remainings(1,chiperrors,be);
 		/*
@@ -320,11 +321,24 @@ double compute_be(int symbol,unsigned long long int chips){
 		be = 4*(1-tmpmx);*/
 	}
 	else {
-		be = 4*w1;
+		be = 2*w1;
 		be1[map(d_chip_num)] += be;
 		estimate_ber_for_remainings(0,chiperrors,be);
 	}
+	//fprintf(stderr,"~~~%f\n",be2[map(d_chip_num)]);
 	return be;
+}
+
+double ber2_impact_adj(double x){
+	
+	if(x < 0.2) return x;
+	else if(x >= 0.2 && x < 0.25) return 0.05;
+	else if(x >= 0.25 && x < 0.3) return 0.3;
+	else if(x >= 0.3 && x < 0.4) return 0.5;
+	//else if(x >= 0.4 && x < 0.5) return 0.35;
+	else if(x >= 0.4 && x < 1) return 0.8;
+	else return x;
+	return x;
 }
 
 int getChipDifferences(unsigned long long int chips){
@@ -340,7 +354,7 @@ int getChipDifferences(unsigned long long int chips){
 		else if(d_chip_num == 16)
 			threshold = gr::blocks::count_bits16((chips & 0x7FFE) ^( CHIP_MAPPING_2[i] & 0x7FFE));
 		else if(d_chip_num == 4)
-			threshold = gr::blocks::count_bits32((chips & 0x6) ^( CHIP_MAPPING_3[i] & 0x6));
+			threshold = gr::blocks::count_bits32((chips & 0x1E) ^( CHIP_MAPPING_3[i] & 0x1E));
 		else
 			threshold = gr::blocks::count_bits64((chips & 0x7FFFFFFFFFFFFFFE) ^( CHIP_MAPPING_4[i] & 0x7FFFFFFFFFFFFFFE));
 		//revision ends
@@ -352,27 +366,31 @@ int getChipDifferences(unsigned long long int chips){
 	return min_threshold;
 }
 
-void SelectThreshold(int ){
-
+void SelectThreshold(int a){
+	//d_threshold = est_threshold[map(d_chip_num)];
 }
 
 void SelectRate(){
 	double be[4];
+	int index = map(d_chip_num);
+	double mybe = be1[index]+be2[index];
+
 	for(int i = 0; i < 4; i++){
 		be[i] = be1[i] + be2[i];
+		//fprintf(stderr,"%f  %f  \n",be1[i],be2[i]);
 	}
+	fprintf(stderr,"be is:%f \n",mybe);
 	char feedback;
-	if(be[3] < ber_cost_upperbound){
+	double th[4][3] = {{-1,-1,0.000001},{-1,0.000005,0.02},{1,15,50},{270,400,800}};
+	if(mybe < th[index][0]) 
 		feedback = 'D';
-	}
-	else if(be[2] < ber_cost_upperbound){
+	else if(mybe >= th[index][0] && mybe <= th[index][1]) 
 		feedback = 'C';
-	}
-	else if(be[1] < ber_cost_upperbound){
+	else if(mybe >= th[index][1] && mybe <= th[index][2]) 
 		feedback = 'B';
-	}
-	else
-		feedback = 'A';
+	else feedback = 'A';
+//	feedback = 'C';
+	fprintf(stderr,"feedback is: %c\n",feedback);
 	FILE *tmpf = fopen("/home/captain/test/transceiver/rec_ack","w+");
 	fprintf(tmpf,"%c",feedback);
 	fclose(tmpf);
@@ -389,6 +407,7 @@ int map(int chip_num){
 int estimate_ber_for_remainings(int error_type, int chiperrors,double be2_pos){//error_type, 0 is ber1, 1 is ber2
 	double tmp;
 	int chip[4] = {64,32,16,4};
+	//fprintf(stderr,"%d,%d,%f\n",error_type,chip_errors,be2_pos);
 	if(error_type == 1){	
 		for(int i = 0; i < 4; i++){
 			if(chip[i] != d_chip_num){
@@ -418,23 +437,63 @@ int estimate_ber_for_remainings(int error_type, int chiperrors,double be2_pos){/
 	return 0;
 }
 
+void SoftRate(){
+	int r[4] = {64,32,16,4};
+	int index = map(d_chip_num);
+	double th[4][3] = {{-1,-1,9},{-1,7,12},{2,5,9},{270,400,800}};
+
+	unsigned char feedback;
+	double mybe;
+	if(d_chip_num != 4){
+		mybe = chip_errors/d_threshold;
+	}
+	else{
+		mybe = be2[index];
+	}
+	fprintf(stderr,"%f\n",mybe);
+	if(mybe < th[index][0]) 
+		feedback = 'D';
+	else if(mybe >= th[index][0] && mybe <= th[index][1]) 
+		feedback = 'C';
+	else if(mybe >= th[index][1] && mybe <= th[index][2]) 
+		feedback = 'B';
+	else feedback = 'A';
+	FILE *tmpf = fopen("/home/captain/test/transceiver/rec_ack","w+");
+	fprintf(tmpf,"%c",feedback);
+	fclose(tmpf);
+
+}
+
+void RateAdaptation(int type){//0:MrZ  1:softrate 2:traditional zigbee
+	if(type == 0){
+		SelectRate();
+	}
+	else if(type == 1){
+		SoftRate();
+	}
+	else{
+		//do nothing
+	}
+}
+
 void receive_frame(){
-	estimated = fopen("/home/captain/experiment/cer-estimation/estimated","ab");
-
-	//fprintf(stderr,"======================\n");
-
-	received = fopen("/home/captain/experiment/ber-estimation/received","ab");
+	int type = 2;
+	SaveResult(type);
+//	estimated = fopen("/home/captain/experiment/cer-estimation/estimated","ab");	
+	received = fopen("/home/captain/experiment/snr/received","ab");
 	fprintf(received,"\n");
 	fclose(received);
-	fprintf(estimated,"%d\n",ce_preamble);
-	//fprintf(sequence,"\n");
-	fclose(estimated);
 	FILE *body_error = fopen("/home/captain/experiment/cer-estimation/bodyerror","ab");
 	fprintf(body_error,"%d\n",chip_errors);
 	fclose(body_error);
 	SelectThreshold(chip_errors);
-	SelectRate();	
+	FILE *dump = fopen("/home/captain/experiment/selection/dumped","ab");
+	fprintf(dump,"%d\n",dumped);
+	fclose(dump);
+	//SelectRate();	
+	RateAdaptation(type);
 	chip_errors = 0;
+
 	sym_cnt = 0;
 	
 	 FILE *be_estimated = fopen("/home/captain/experiment/ber-estimation/estimated","ab");
@@ -446,26 +505,47 @@ void receive_frame(){
 	received_be = fopen("/home/captain/experiment/ber-estimation/received_be","ab");
 	fprintf(received_be,"\n");
 	fclose(received_be);
-	bct = 0;
 
+	FILE *f_prob = fopen("/home/captain/experiment/ber-estimation/probability","ab");
+	fprintf(f_prob,"\n");
+	fclose(f_prob);
+
+	bct = 0;
+	dumped = 0;
+	//d_shift_reg = 0;
 }
 
 void receive_symbol(unsigned long long int d_shift_reg,unsigned char c){
 	if(sym_cnt != 4 && sym_cnt != 5){
 		int tmpcnt = count_error(d_shift_reg,d_chip_num,c);
 		chip_errors += tmpcnt;
-		fprintf(stderr,"~%d\n~",tmpcnt);
 	}
 	sym_cnt++;
-	//	fprintf(stream2, "%d\n",c);
 	compute_per_bit(c);
 	be[bct] = compute_be(c,d_shift_reg);
-	//fprintf(stderr,"%d\n",c);
 	bct++;
 	received_be = fopen("/home/captain/experiment/ber-estimation/received_be","ab");
 	fprintf(received_be,"%d ",c);
 	fclose(received_be);
 
+}
+
+void SaveResult(int type){
+	if(type == 0) {
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/mrz","ab");
+		fprintf(res,"%d\t",d_chip_num);
+		fclose(res);
+	}
+	else if(type == 1){
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/softrate","ab");
+		fprintf(res,"%d\t",d_chip_num);
+		fclose(res);
+	}
+	else{
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/zigbee","ab");
+		fprintf(res,"%d\t",d_chip_num);
+		fclose(res);
+	}
 }
 
 packet_sink_impl(int threshold,int chip_num)
@@ -480,7 +560,7 @@ packet_sink_impl(int threshold,int chip_num)
 	d_lqi = 0;
 	d_lqi_sample_count = 0;
 
-	d_head_threshold = 19;
+	d_head_threshold = 17;
 	ce_preamble = 0;
 	//d_threshold = 5;
 	if ( VERBOSE )
@@ -492,11 +572,12 @@ packet_sink_impl(int threshold,int chip_num)
 	sym_cnt = 0;
 	w1=1;
 	w2=1;
-	ber_cost_upperbound = 0;
+	ber_cost_upperbound = 20;
 	est_threshold[0] = 18;
 	est_threshold[1] = 8;
-	est_threshold[2] = 5;
+	est_threshold[2] = 4;
 	est_threshold[3] = 1;
+	dumped = 0;
 	message_port_register_out(pmt::mp("out"));
 	
 
@@ -504,9 +585,6 @@ packet_sink_impl(int threshold,int chip_num)
 
 ~packet_sink_impl()
 {
-	fclose(received);
-	fclose(estimated);
-	fclose(sequence);
 }
 
 int general_work(int noutput, gr_vector_int& ninput_items,
@@ -596,7 +674,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								//	fclose(f);
 									d_packet_byte |= 0xA;
 									d_chip_num = 64;
-									d_threshold = 18;
+									d_threshold = 23;
 									if (VERBOSE2)
 										fprintf(stderr,"Found sync, 0x%x\n", d_packet_byte),fflush(stderr);
 									// found SDF
@@ -612,25 +690,20 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								//	fclose(f);
 									d_packet_byte |= 0xB;
 									d_chip_num = 32;
-									d_threshold = 8;
+									d_threshold = 10;
 									enter_have_sync();
 									break;
 								}
 								else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[12] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold){
 									ce_preamble += 	gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[12] & 0xFFFFFFFFFFFFFFFE));
-									fprintf(stderr,"?\n");
-							//		fprintf(f,"%d\n",ce_preamble);
-								//	fclose(f);
 									d_packet_byte |= 0xC;
 									d_chip_num = 16;
-									d_threshold = 5;
+									d_threshold = 4;
 									enter_have_sync();
 									break;
 								}
 								else if (gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[13] & 0xFFFFFFFFFFFFFFFE)) <= d_head_threshold){
 									ce_preamble +=  gr::blocks::count_bits64((d_shift_reg & 0x7FFFFFFFFFFFFFFE) ^ (CHIP_MAPPING_4[13] & 0xFFFFFFFFFFFFFFFE));
-			//						fprintf(f,"%d\n",ce_preamble);
-								//	fclose(f);
 									d_packet_byte |= 0xD;
 									d_chip_num = 4;
 									d_threshold = 1;
@@ -638,7 +711,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 									break;
 								}
 								 else {
-									// fprintf(f,"%d\n",ce_preamble+15);
 									if (VERBOSE)
 										fprintf(stderr, "Wrong second byte of SFD. %u\n", d_shift_reg), fflush(stderr);
 								//	enter_search();
@@ -741,7 +813,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 					if(d_chip_cnt == 4+2){
 						d_chip_cnt = 0;
 						unsigned char c = decode_chips(d_shift_reg);
-						//fprintf(stream2,"%d\n",c);
 
 						if(c == 0xFF){
 							// something is wrong. restart the search for a sync
@@ -762,6 +833,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						if(d_packet_byte_index%2 == 0){
 							// we have a complete byte which represents the frame length.
 							int frame_len = d_packet_byte;
+							frame_len = 32;
 							if(frame_len <= MAX_PKT_LEN){
 								enter_have_header(frame_len);
 							} else {
@@ -813,6 +885,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_HEADER:
+			fprintf(stderr,"threshold:%d\td_chip_num:%d\t",d_threshold,d_chip_num);
 			have_header = 1;
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
@@ -876,8 +949,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 							
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 								//my code
-								fprintf(received,"\n");
-								fprintf(sequence,"\n");
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
 								fprintf(stderr,"Error chip number is: %d\n",error_count);
 
@@ -900,6 +971,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						unsigned char c = decode_chips(d_shift_reg);	
 						receive_symbol(d_shift_reg,c);
 						if(c == 0xff){
+							dumped++;
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
@@ -959,6 +1031,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 						unsigned char c = decode_chips(d_shift_reg);
 						receive_symbol(d_shift_reg,c);
 						if(c == 0xff){
+							dumped++;
 							// something is wrong. restart the search for a sync
 							if(VERBOSE2)
 								fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
@@ -1000,7 +1073,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
 								fprintf(stderr,"Error chip number is: %d\n",error_count);
 							//	FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
-								fprintf(received,"\n");
 								//fclose(f);
 
 								if(VERBOSE2)
@@ -1062,8 +1134,6 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
 								//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
-								fprintf(received,"\n");
-								fprintf(sequence,"\n");
 							//	fclose(f);
 
 								fprintf(stderr,"Error chip number is: %d\n",error_count);
@@ -1147,6 +1217,7 @@ private:
 	double			be1[4];
 	double			be2[4];
 	int				est_threshold[4];
+	int				dumped;
 	// FIXME:
 	char buf[256];
 };

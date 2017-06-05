@@ -23,6 +23,7 @@ sys.path.append(os.environ.get('GRC_HIER_PATH', os.path.expanduser('~/.grc_gnura
 from PyQt4 import Qt
 from PyQt4.QtCore import QObject, pyqtSlot
 from gnuradio import blocks
+from gnuradio import analog
 from gnuradio import eng_notation
 from gnuradio import gr
 from gnuradio import qtgui
@@ -173,6 +174,8 @@ class transceiver_OQPSK(gr.top_block, Qt.QWidget):
         self.blocks_file_sink_1 = blocks.file_sink(gr.sizeof_char*1, "/tmp/sensor.pcap", False)
         self.blocks_file_sink_1.set_unbuffered(True)
         self.ieee802_15_4_message_generator_0 = ieee802_15_4.message_generator()
+        self.blocks_add_xx_0 = blocks.add_vcc(1)
+        self.analog_noise_source_x_0 = analog.noise_source_c(analog.GR_GAUSSIAN,0,0)
         ##################################################
         # Connections
         ##################################################
@@ -189,8 +192,11 @@ class transceiver_OQPSK(gr.top_block, Qt.QWidget):
         self.connect((self.foo_wireshark_connector_1_0, 0), (self.blocks_file_sink_1_0, 0))    
         self.connect((self.foo_wireshark_connector_1_0_0, 0), (self.blocks_file_sink_1_0_0, 0))    
         self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.qtgui_freq_sink_x_0, 0))    
-        self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.uhd_usrp_sink_1, 0))    
+        #self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.uhd_usrp_sink_1, 0))    
         self.connect((self.uhd_usrp_source_1, 0), (self.ieee802_15_4_oqpsk_phy_0, 0))    
+        self.connect((self.ieee802_15_4_oqpsk_phy_0,0),(self.blocks_add_xx_0,0))
+        self.connect((self.analog_noise_source_x_0,0),(self.blocks_add_xx_0,1))
+        self.connect((self.blocks_add_xx_0,0),(self.uhd_usrp_sink_1,0))
 
     def closeEvent(self, event):
         self.settings = Qt.QSettings("GNU Radio", "transceiver_OQPSK")
@@ -464,8 +470,8 @@ def main(top_block_cls=transceiver_OQPSK, options=None):
     tb = top_block_cls()
     tb2 = top_clock_ack()
     road = 0;
-    t=2000;
-    k = 2000;
+    t=30;
+    k = 30;
 #seq represents the number of received packets by 2 from 1
 #seq2 represents the # of received packets by 1 from 2
     while True:
@@ -495,7 +501,7 @@ def main(top_block_cls=transceiver_OQPSK, options=None):
             tb.lock()
             tb.unlock()
         t = t - 1
-        time.sleep(0.005)
+        time.sleep(0.0005)
         f = open('/home/captain/test/seq/seq_1','r')
         str2 = f.read()
         if str2:

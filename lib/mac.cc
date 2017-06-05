@@ -21,6 +21,8 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <sys/time.h>
+
 
 using namespace gr::ieee802_15_4;
 
@@ -66,6 +68,9 @@ void mac_in(pmt::pmt_t msg) {
 	} else {
 		assert(false);
 	}
+	struct timeval a;
+	gettimeofday(&a,NULL);
+	fprintf(stderr,"%lld\n",a.tv_usec);
 
 	size_t data_len = pmt::blob_length(blob);
 	dout << "Frame length is:" << data_len << std::endl;
@@ -83,7 +88,7 @@ void mac_in(pmt::pmt_t msg) {
 	}
 	std::cout << std::endl;
 
-
+	int cc = 0;
 
 //	fprintf(stderr,"%d %d\n",d_is_sender,buf[9]);
 	if((buf[9] == 0xcd && !d_is_sender) || (buf[9] == 0x29 && d_is_sender))
@@ -94,10 +99,12 @@ void mac_in(pmt::pmt_t msg) {
 		if(crc) {
 			d_num_packet_errors++;
 			dout << "MAC: wrong crc. Dropping packet!" << std::endl;
-			return;
+			SaveResult(cc,0);
+			//return;
 		}
 		else{
 			dout << "MAC: correct crc. Propagate packet to APP layer." << std::endl;
+			SaveResult(cc,1);
 		}
 		pmt::pmt_t mac_payload = pmt::make_blob((char*)pmt::blob_data(blob) + 15 , data_len-15-2);// maybe +9, -2 -1
 //	char *buf = (char*)pmt::blob_data(blob);
@@ -112,9 +119,9 @@ void mac_in(pmt::pmt_t msg) {
 		FILE *f;
 		if(buf[9] == 0xcd && !d_is_sender){//2 sends, 1 receives, now 1 receives
 			//write 0
-			f = fopen("/home/captain/test/transceiver/rec_ack","w+");
-			fprintf(f,"%c",buf[19]);
-			fclose(f);
+			//f = fopen("/home/captain/test/transceiver/rec_ack","w+");
+		    //fprintf(f,"%c",buf[19]);
+			//fclose(f);
 /*
 			int x;
 			f = fopen("/home/captain/test/seq/seq_2","r");
@@ -264,6 +271,13 @@ void generate_mac(const char *buf, int len) {
 	d_msg[16 + len] = crc >> 8;
 
 	d_msg_len = 15 + len + 2;
+	struct timeval a;
+	gettimeofday(&a,NULL);
+	fprintf(stderr,"%lld\n",a.tv_usec);
+	sleep(0.5);
+	gettimeofday(&a,NULL);
+	fprintf(stderr,"%lld\n",a.tv_usec);
+
 }
 
 void print_message() {
@@ -281,6 +295,25 @@ int get_num_packet_errors(){ return d_num_packet_errors; }
 int get_num_packets_received(){ return d_num_packets_received; }
 
 float get_packet_error_ratio(){ return float(d_num_packet_errors)/d_num_packets_received; }
+
+void SaveResult(int type,int isACK){
+	if(type == 0){
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/mrz","ab");
+		fprintf(res,"%d\n",isACK);
+		fclose(res);	
+	}
+	else if(type == 1){
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/softrate","ab");
+		fprintf(res,"%d\n",isACK);
+		fclose(res);	
+	}
+	else{
+		FILE *res = fopen("/home/captain/experiment/throughput/static-ec/zigbee","ab");
+		fprintf(res,"%d\n",isACK);
+		fclose(res);	
+
+	}
+}
 
 private:
 	bool        d_debug;
