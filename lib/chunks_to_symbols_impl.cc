@@ -172,7 +172,6 @@ int chunks_to_symbols_impl::work(
 	  int d_D = getChipNum(tmp[0])/2;
 	  symbol_table_init();
 	  FILE *f2 = fopen("/home/captain/experiment/cer-estimation/send","a+");
-	  fprintf(stderr,"d_D is: %d\n",d_D);
 	  int ct = 0;
       for(int m = 0 ; m < nstreams; m++) {
         const int8_t *in = (int8_t*)input_items[m];
@@ -213,5 +212,9 @@ int chunks_to_symbols_impl::work(
       }
 	  fprintf(f2,"\n");
 	  fclose(f2);
+	  struct timeval a;
+	  gettimeofday(&a,NULL);
+	  fprintf(stderr,"Sending time: %lld\n",a.tv_usec);
+	  
       return noutput_items;
 }

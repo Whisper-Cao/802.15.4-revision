@@ -379,9 +379,10 @@ void SelectRate(){
 		be[i] = be1[i] + be2[i];
 		//fprintf(stderr,"%f  %f  \n",be1[i],be2[i]);
 	}
-	fprintf(stderr,"be is:%f \n",mybe);
+	//fprintf(stderr,"be is:%f \n",mybe);
+	fprintf(stderr,"Bit error rate: %.3f\n",(be1[index]+be2[index]/4)/256);
 	char feedback;
-	double th[4][3] = {{-1,-1,0.000001},{-1,0.000005,0.02},{1,15,50},{270,400,800}};
+	double th[4][3] = {{-1,-1,0.000001},{-1,0.000005,0.04},{0.5,20,50},{160,400,800}};
 	if(mybe < th[index][0]) 
 		feedback = 'D';
 	else if(mybe >= th[index][0] && mybe <= th[index][1]) 
@@ -389,8 +390,9 @@ void SelectRate(){
 	else if(mybe >= th[index][1] && mybe <= th[index][2]) 
 		feedback = 'B';
 	else feedback = 'A';
-//	feedback = 'C';
-	fprintf(stderr,"feedback is: %c\n",feedback);
+	int char_to_length[4] = {64,32,16,8};
+	int s = (d_chip_num == 4) ? 8:d_chip_num;
+	fprintf(stderr,"The spreading length is: %d\n",s);
 	FILE *tmpf = fopen("/home/captain/test/transceiver/rec_ack","w+");
 	fprintf(tmpf,"%c",feedback);
 	fclose(tmpf);
@@ -477,6 +479,7 @@ void RateAdaptation(int type){//0:MrZ  1:softrate 2:traditional zigbee
 }
 
 void receive_frame(){
+	fprintf(stderr,"Spreading Length is: %d\n",d_chip_num);
 	int type = 2;
 	SaveResult(type);
 //	estimated = fopen("/home/captain/experiment/cer-estimation/estimated","ab");	
@@ -571,7 +574,7 @@ packet_sink_impl(int threshold,int chip_num)
 	chip_errors = 0;
 	sym_cnt = 0;
 	w1=1;
-	w2=1;
+	w2=4;
 	ber_cost_upperbound = 20;
 	est_threshold[0] = 18;
 	est_threshold[1] = 8;
@@ -885,7 +888,13 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 			break;
 
 		case STATE_HAVE_HEADER:
-			fprintf(stderr,"threshold:%d\td_chip_num:%d\t",d_threshold,d_chip_num);
+			struct timeval a;
+			gettimeofday(&a,NULL);
+			fprintf(stderr,"==========\n");
+			fprintf(stderr,"%lld\n",a.tv_usec);
+			fprintf(stderr,"~~~~~~~~~~\n");
+
+			//fprintf(stderr,"threshold:%d\td_chip_num:%d\t",d_threshold,d_chip_num);
 			have_header = 1;
 			if (VERBOSE2)
 				fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
@@ -950,7 +959,12 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 								//my code
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
-								fprintf(stderr,"Error chip number is: %d\n",error_count);
+								//fprintf(stderr,"Error chip number is: %d\n",error_count);
+								struct timeval a;
+								gettimeofday(&a,NULL);
+								fprintf(stderr,"!!!!!!!!!!\n");
+								fprintf(stderr,"%lld\n",a.tv_usec);
+								fprintf(stderr,";;;;;;;;;;\n");
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);
@@ -1011,7 +1025,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
-								fprintf(stderr,"Error chip number is: %d\n",error_count);
+								//fprintf(stderr,"Error chip number is: %d\n",error_count);
 								//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
 								//fclose(f);
 
@@ -1071,7 +1085,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								pmt::pmt_t payload = pmt::make_blob(buf, d_packetlen_cnt);
 
 								message_port_pub(pmt::mp("out"), pmt::cons(meta, payload));
-								fprintf(stderr,"Error chip number is: %d\n",error_count);
+								//fprintf(stderr,"Error chip number is: %d\n",error_count);
 							//	FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
 								//fclose(f);
 
@@ -1136,7 +1150,7 @@ int general_work(int noutput, gr_vector_int& ninput_items,
 								//FILE *f = fopen("/home/captain/experiment/cer-estimation/received","a+");
 							//	fclose(f);
 
-								fprintf(stderr,"Error chip number is: %d\n",error_count);
+								//fprintf(stderr,"Error chip number is: %d\n",error_count);
 
 								if(VERBOSE2)
 									fprintf(stderr, "Adding message of size %d to queue\n", d_packetlen_cnt);

@@ -68,12 +68,10 @@ void mac_in(pmt::pmt_t msg) {
 	} else {
 		assert(false);
 	}
-	struct timeval a;
-	gettimeofday(&a,NULL);
-	fprintf(stderr,"%lld\n",a.tv_usec);
+	
 
 	size_t data_len = pmt::blob_length(blob);
-	dout << "Frame length is:" << data_len << std::endl;
+	//dout << "Frame length is:" << data_len << std::endl;
 	
 	if(data_len < 17) {
 		dout << "MAC: frame too short. Dropping!" << std::endl;
@@ -103,7 +101,7 @@ void mac_in(pmt::pmt_t msg) {
 			//return;
 		}
 		else{
-			dout << "MAC: correct crc. Propagate packet to APP layer." << std::endl;
+			dout << "MAC: correct crc. Propagate packet to APP layer!" << std::endl;
 			SaveResult(cc,1);
 		}
 		pmt::pmt_t mac_payload = pmt::make_blob((char*)pmt::blob_data(blob) + 15 , data_len-15-2);// maybe +9, -2 -1
@@ -118,16 +116,6 @@ void mac_in(pmt::pmt_t msg) {
 		message_port_pub(pmt::mp("app out"), pmt::cons(pmt::PMT_NIL, mac_payload));
 		FILE *f;
 		if(buf[9] == 0xcd && !d_is_sender){//2 sends, 1 receives, now 1 receives
-			//write 0
-			//f = fopen("/home/captain/test/transceiver/rec_ack","w+");
-		    //fprintf(f,"%c",buf[19]);
-			//fclose(f);
-/*
-			int x;
-			f = fopen("/home/captain/test/seq/seq_2","r");
-			fscanf(f,"%d",&x);
-			fclose(f);
-			x++;*/
 			seq2_num++;
 			while(1){
 				if(f = fopen("/home/captain/test/seq/seq_2","w+")){
@@ -150,12 +138,6 @@ void mac_in(pmt::pmt_t msg) {
 			fprintf(f,"%d",ack_num);
 			fclose(f);
 				
-			/*
-			int x;
-			f = fopen("/home/captain/test/seq/seq_1","r");//the received packets from 1 increase
-			fscanf(f,"%d",&x);
-			fclose(f);
-			x++;*/
 			seq1_num++;
 			while(1){
 				if(f = fopen("/home/captain/test/seq/seq_1","w+"))
@@ -191,7 +173,7 @@ void app_in(pmt::pmt_t msg) {
 	//dout << "MAC: received new message from APP of length " << pmt::blob_length(blob) << std::endl;
 
 	generate_mac((const char*)pmt::blob_data(blob), pmt::blob_length(blob));
-	print_message();
+	//print_message();
 	message_port_pub(pmt::mp("pdu out"), pmt::cons(pmt::PMT_NIL,
 			pmt::make_blob(d_msg, d_msg_len)));
 }
@@ -217,7 +199,7 @@ uint16_t crc16(char *buf, int len) {
 void generate_mac(const char *buf, int len) {
 
 
-	fprintf(stderr, "I'm generatine a mac pac, %d!\n",d_is_sender);
+	fprintf(stderr, "============Generating a packet===============, %d!\n",d_is_sender);
 	// FCF
 	// data frame, no security
 	d_msg[0] = 0x41;
@@ -271,12 +253,13 @@ void generate_mac(const char *buf, int len) {
 	d_msg[16 + len] = crc >> 8;
 
 	d_msg_len = 15 + len + 2;
+	
 	struct timeval a;
 	gettimeofday(&a,NULL);
 	fprintf(stderr,"%lld\n",a.tv_usec);
-	sleep(0.5);
-	gettimeofday(&a,NULL);
-	fprintf(stderr,"%lld\n",a.tv_usec);
+//	sleep(0.5);
+//	gettimeofday(&a,NULL);
+//	fprintf(stderr,"%lld\n",a.tv_usec);
 
 }
 

@@ -50,6 +50,9 @@
 #include "ieee802_15_4/feedback_generator.h"
 #include "ieee802_15_4/renew_chip_num.h"
 #include "ieee802_15_4/message_generator.h"
+#include "ieee802_15_4/time_output.h"
+#include "ieee802_15_4/burst_tagger.h"
+#include "ieee802_15_4/quadrature_demod_cf.h"
 %}
 
 %include "ieee802_15_4/access_code_prefixer.h"
@@ -110,3 +113,10 @@ GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, chunks_to_symbols);
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, feedback_generator);
 %include "ieee802_15_4/message_generator.h"
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, message_generator);
+%include "ieee802_15_4/time_output.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, time_output);
+%include "ieee802_15_4/burst_tagger.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, burst_tagger);
+%include "ieee802_15_4/quadrature_demod_cf.h"
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, quadrature_demod_cf);
+

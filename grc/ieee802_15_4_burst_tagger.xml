@@ -1,0 +1,34 @@
+<block>
+  <name>Testing Burst Tagger</name>
+  <key>ieee802_15_4_burst_tagger</key>
+  <category>[IEEE802.15.4]</category>
+  <import>import ieee802_15_4</import>
+	<import>import pmt </import>
+  <make>ieee802_15_4.burst_tagger($tag_name, $mult)</make>
+
+  <param>
+    <name>Tag Name</name>
+    <key>tag_name</key>
+    <value>pmt.intern("burst_len")</value>
+    <type>raw</type>
+  </param>
+
+  <param>
+    <name>Multiplier</name>
+    <key>mult</key>
+    <value>1</value>
+    <type>int</type>
+  </param>
+
+  <check>$mult > 0</check>
+
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+
+  <source>
+    <name>out</name>
+    <type>complex</type>
+  </source>
+</block>

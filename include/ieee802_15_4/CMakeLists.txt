@@ -44,6 +44,9 @@ install(FILES
     renew_chip_num.h
     message_generator.h
     feedback_generator.h
+	time_output.h
+	burst_tagger.h
+	quadrature_demod_cf.h
     DESTINATION ${GR_INCLUDE_DIR}/gnuradio/ieee802_15_4
     COMPONENT "ieee802_15_4_devel"
 )

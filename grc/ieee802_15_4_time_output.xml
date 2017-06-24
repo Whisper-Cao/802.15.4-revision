@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<block>
+	<name>Time Output</name>
+	<key>time_output</key>
+	<category>[IEEE802.15.4]</category>
+	<import>import ieee802_15_4</import>
+	<make>ieee802_15_4.time_output()</make>
+
+	<sink>
+		<name>msg</name>
+		<type>complex</type>
+		<optional>1</optional>
+	</sink>
+
+
+</block>

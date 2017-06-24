@@ -53,6 +53,9 @@ list(APPEND ieee802_15_4_sources
     renew_chip_num.cc
     message_generator_impl.cc
     feedback_generator_impl.cc
+	time_output.cc
+	burst_tagger_impl.cc
+	quadrature_demod_cf_impl.cc
 )
 
 list(APPEND ieee802_15_4_libs
